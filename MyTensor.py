@@ -122,5 +122,26 @@ class MyTensor(metaclass=TensorMeta):
         转置
         '''
         self.data = np.transpose(self.data)
+
+    def __len__(self):
+        '''
+        返回长度
+        '''
+        return len(self.data)
     
-    
+    def __getitem__(self, key):
+        '''
+        重写索引
+        '''
+        if isinstance(key, tuple):
+            new_key = []
+            for k in key:
+                if isinstance(k, MyTensor):
+                    new_key.append(k.data)
+                else:
+                    new_key.append(k)
+            key = tuple(new_key)
+        elif isinstance(key, MyTensor):
+            key = key.data
+        return self.data[key]
+            
