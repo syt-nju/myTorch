@@ -4,7 +4,7 @@ import numpy as np
 #meta 类，定义一些需要的基本属性和简单初始化 
 class TensorMeta(type):
     '''
-    Tensor的 meta类,定义Tensor在类最最初始时的初始化
+    Tensor 的 meta 类,定义 Tensor 在类最最初始时的初始化
     '''
     def __init__(cls, name, bases, attrs):
         '''
@@ -18,6 +18,17 @@ class TensorMeta(type):
         cls.device = "cpu" #规定在cpu或者gpu上运行
         cls.dtype = float
         cls.dim = None
+
+# TODO: 实现计算图类
+class ComputationalGraph:
+    '''
+    计算图类，可以理解为一个链表，每个节点是一个操作
+    需要实现的方法:
+    1. 添加图节点
+    2. 释放节点
+    '''
+    NotImplementedError
+
 
 class MyTensor(metaclass=TensorMeta):
     '''
@@ -123,6 +134,29 @@ class MyTensor(metaclass=TensorMeta):
         '''
         self.data = np.transpose(self.data)
 
+    @property
+    def shape(self):
+        '''
+        返回 MyTensor 的形状
+        '''
+        return self.data.shape
+    
+    @property
+    def ndim(self) -> int:
+        '''
+        返回 MyTensor 的维度
+        '''
+        return self.data.ndim
+    
+    @property
+    def dtype(self):
+        '''
+        返回 MyTensor 的数据类型
+        '''
+        return self.data.dtype
+
+
+
     def __len__(self):
         '''
         返回长度
@@ -144,4 +178,50 @@ class MyTensor(metaclass=TensorMeta):
         elif isinstance(key, MyTensor):
             key = key.data
         return self.data[key]
+    
+
+    #TODO: 实现梯度相关的方法
+    @property
+    def is_leaf(self)->bool:
+        '''
+        判断是否是叶子节点
+        '''
+        NotImplementedError
+
+    def backward(self, retain_graph=False):
+        '''
+        反向传播
+        retain_graph: 是否保留计算图
+        '''
+        NotImplementedError
+    
+    def zero_grad(self):
+        '''
+        梯度清零
+        '''
+        NotImplementedError
             
+#TODO: 实现基本的操作类,支持梯度传播
+class BinaryOp(MyTensor):
+    def __init__(self, x:  MyTensor, y:MyTensor) -> None:
+        assert x.device == y.device, "device not match"
+        self.device = x.device
+        NotImplementedError
+    
+    def forward(self, x: MyTensor, y: MyTensor)->np.ndarray:
+        NotImplementedError
+
+    def backward(self, x: MyTensor, grad: np.ndarray)->np.ndarray:
+        '''
+        x: 下游节点
+        grad: 上游传入该节点的梯度
+        '''
+        NotImplementedError
+
+class Add(BinaryOp):
+
+    def forward(self, x: MyTensor, y: MyTensor)->np.ndarray:
+        return x.data + y.data
+
+    def backward(self, x: MyTensor, grad: np.ndarray)->np.ndarray:
+        return grad[...]
