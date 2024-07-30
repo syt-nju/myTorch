@@ -1,5 +1,6 @@
 #基于numpy 构建基本的Tensor类
 import numpy as np
+from autograd import no_grad, is_grad_enabled  
 #构建基础版Tensor类
 #meta 类，定义一些需要的基本属性和简单初始化 
 class TensorMeta(type):
@@ -39,12 +40,18 @@ class MyTensor(metaclass=TensorMeta):
         初始化Tensor
         '''
         self.data = np.array(data, dtype=dtype)
-        self.requires_grad = requires_grad
         self.device = device
         self.dtype = dtype
         self.dim = data.ndim
         self.shape = data.shape
-        self.grad = None
+
+        self.requires_grad = requires_grad and is_grad_enabled()
+        if self.requires_grad and self.data.dtype != np.float:
+            raise TypeError("only float tensor can require gradients")
+        if self.requires_grad:
+            self.grad = np.zeros_like(data)
+        else:
+            self.grad = None
 
     def __repr__(self):
         '''
@@ -219,9 +226,14 @@ class BinaryOp(MyTensor):
         NotImplementedError
 
 class Add(BinaryOp):
+    '''
+    加法算子, 继承自BinaryOp
+    '''
 
     def forward(self, x: MyTensor, y: MyTensor)->np.ndarray:
         return x.data + y.data
 
     def backward(self, x: MyTensor, grad: np.ndarray)->np.ndarray:
         return grad[...]
+    
+# TODO 实现其它常用算子
