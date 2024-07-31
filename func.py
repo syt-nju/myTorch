@@ -2,7 +2,7 @@
 
 import numpy as np
 import MyTensor
-import torch
+
 
 def sigmoid(x:MyTensor)->MyTensor:
     '''
@@ -16,6 +16,7 @@ def softmax(x:MyTensor)->MyTensor:
     '''
     x_sub_max = x.data - np.max(x.data)
     x.data = np.exp(x_sub_max)/np.sum(np.exp(x_sub_max))
+    #x.data=np.exp(x.data)/np.sum(np.exp(x.data)),采用上述形式防止溢出
 
 def ReLU(x:MyTensor)->MyTensor:
     '''
@@ -29,7 +30,7 @@ def tanh(x:MyTensor)->MyTensor:
     '''
     x.data = np.tanh(x.data)
 
-def leaky_ReLU(x:MyTensor, alpha: float)->MyTensor:
+def leaky_ReLU(x:MyTensor, alpha: float=0.001)->MyTensor:
     '''
     实现leaky_relu函数
     '''
@@ -89,20 +90,37 @@ def CrossEntropyLoss(y_pred:MyTensor, y_true:MyTensor, reduction = 'sum'):
     
 
 if __name__ == "__main__":
-    a = MyTensor.MyTensor(np.array([1,2,3,4]))
-    b = MyTensor.MyTensor(np.array([3,4,1,-4]))
-    print(CrossEntropyLoss(a,b,'sum'))
-    print(MSELoss(a,b,'mean'))
-
-    a1 = torch.tensor([1,2,3,4], dtype=torch.float32)
-    b1 = torch.tensor([3,4,1,-4], dtype=torch.float32)
-    print(torch.nn.CrossEntropyLoss()(a1,b1))
-
-    loss1 = torch.nn.MSELoss()
-    input = torch.tensor([1,2,3,4], dtype=torch.float32)
-    target = torch.tensor([3,4,1,-4], dtype=torch.float32)
-    output = loss1(input, target)
-    print(output)
+    #批量测试
+    import torch
+    from utils import myAssert
+    #构造函数list
+    single_input_funcs=[sigmoid,softmax,ReLU,tanh,leaky_ReLU]#单输入函数.leaky_ReLU函数需要额外参数alpha,默认为1e-3
+    double_input_funcs=[L1Loss,MSELoss,NLL_loss,CrossEntropyLoss]#双输入函数
     
+    #构造数据
+    np.random.seed(0)
+    epcho=100
+    #单输入函数的测试
+    for i in range(epcho):
+        X=np.random.randn(3,3)
+        for func in single_input_funcs:
+            result=MyTensor.MyTensor(X)
+            func(result)
+            result_np=result.data
+            if func==sigmoid:
+                result_torch=torch.sigmoid(torch.tensor(X))
+            elif func==softmax:
+                result_torch=torch.softmax(torch.tensor(X),dim=1)
+            elif func==ReLU:
+                result_torch=torch.relu(torch.tensor(X))
+            elif func==tanh:
+                result_torch=torch.tanh(torch.tensor(X))
+            elif func==leaky_ReLU:
+                result_torch=torch.nn.functional.leaky_relu(torch.tensor(X),negative_slope=1e-3)
+            else:
+                raise ValueError("未知的函数")
+            judge=np.allclose(result_np,result_torch.numpy(),atol=1e-5)
+            myAssert(judge,f"{func.__name__}函数,在第{i}轮测试失败",result_np,result_torch.numpy())
+    #双输入检查还没写        
     
 

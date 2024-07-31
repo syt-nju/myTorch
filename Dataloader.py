@@ -38,7 +38,7 @@ class Sampler:
     def __iter__(self):
         NotImplementedError
 
-class RandomSample(Sampler):
+class RandomSampler(Sampler):
     '''
     随机采样器，从数据集中随机抽取样本，对应 shuffle = True 的情况
     '''
@@ -52,7 +52,7 @@ class RandomSample(Sampler):
     def __len__(self):
         return len(self.dataset)
     
-class SequentialSample(Sampler):
+class SequentialSampler(Sampler):
     '''
     顺序采样器，默认情况
     '''
@@ -126,9 +126,9 @@ class DataLoader:
         self.drop_last = drop_last
 
         if shuffle == True:
-            self.sampler = RandomSample(dataset)
+            self.sampler = RandomSampler(dataset)
         else:
-            self.sampler = SequentialSample(dataset)
+            self.sampler = SequentialSampler(dataset)
         self.batch_sampler = BatchSampler(self.sampler, batch_size, drop_last)
 
 
