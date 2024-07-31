@@ -110,7 +110,7 @@ if __name__ == "__main__":
             if func==sigmoid:
                 result_torch=torch.sigmoid(torch.tensor(X))
             elif func==softmax:
-                result_torch=torch.softmax(torch.tensor(X),dim=1)
+                result_torch=torch.softmax(torch.tensor(X))
             elif func==ReLU:
                 result_torch=torch.relu(torch.tensor(X))
             elif func==tanh:
