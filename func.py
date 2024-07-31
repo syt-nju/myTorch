@@ -10,12 +10,14 @@ def sigmoid(x:MyTensor)->MyTensor:
     '''
     x.data = 1/(1 + np.exp(-x.data))
 
-def softmax(x:MyTensor)->MyTensor:
+def softmax(x:MyTensor, dim = 1)->MyTensor:
     '''
     实现softmax函数
     '''
-    x_sub_max = x.data - np.max(x.data)
-    x.data = np.exp(x_sub_max)/np.sum(np.exp(x_sub_max))
+    x_sub_max = x.data - np.max(x.data, axis = dim, keepdims = True)
+    exp = np.exp(x_sub_max)
+    exp_sum = np.sum(exp, axis = dim, keepdims = True)
+    x.data = exp/exp_sum
     #x.data=np.exp(x.data)/np.sum(np.exp(x.data)),采用上述形式防止溢出
 
 def ReLU(x:MyTensor)->MyTensor:

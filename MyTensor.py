@@ -1,4 +1,5 @@
 #基于numpy 构建基本的Tensor类
+from typing import Union, Tuple
 import numpy as np
 from autograd import no_grad, is_grad_enabled  
 #构建基础版Tensor类
@@ -207,6 +208,17 @@ class MyTensor(metaclass=TensorMeta):
         梯度清零
         '''
         NotImplementedError
+    
+    def max(self, axis = None, keepdims: bool = False):
+        '''
+        最大值
+        '''
+        return np.max(self.data, axis=axis, keepdims=keepdims)
+
+    def sum(self, axis = None, keepdims: bool = False):
+        return np.sum(self, axis, keepdims)
+
+
             
 #TODO: 实现基本的操作类,支持梯度传播
 class BinaryOp(MyTensor):
