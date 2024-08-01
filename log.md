@@ -6,10 +6,10 @@ func.py中的nll函数出问题
 ```
 (pytor-basic) PS C:\Users\nju22\Desktop\myTorch> & C:/conda/envs/pytor-basic/python.exe c:/Users/nju22/Desktop/myTorch/func.py
 单输入检查完成
--1.3862943611198906
--1.0
-[2 1 1]
-[2 1 1]
+-1.3862943611198906     #你写的nll的输出
+-1.0					#torch的nll的输出
+[2 1 1]  				
+[2 1 1]					#y_true和y_pred的值，详情请见myAssert的调用处
 Traceback (most recent call last):
   File "c:\Users\nju22\Desktop\myTorch\func.py", line 148, in <module>
     myAssert(judge, f"{func.__name__} function failed in round {i}", result, result_torch.numpy(),y_true,y_pred)
