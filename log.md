@@ -3,7 +3,9 @@
 func.py中的nll函数出问题
 测试函数运行结果：
 >(pytor-basic) PS C:\Users\nju22\Desktop\myTorch> & C:/conda/envs/pytor-basic/python.exe c:/Users/nju22/Desktop/myTorch/func.py
+
 单输入检查完成
+
 -1.3862943611198906
 -1.0
 [2 1 1]
