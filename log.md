@@ -1,6 +1,9 @@
 # debug 日志
 ## 2024.8.1
-func.py中的nll函数出问题
+
+### Bug
+**func.py 中的 nll 函数出问题**
+
 测试函数运行结果：
 
 ```
@@ -18,3 +21,33 @@ Traceback (most recent call last):
 AssertionError: NLL_loss function failed in round 0
 ```
 
+### bugfix: 对 NLL 损失函数的定义理解有误
+
+之前以为负对数的计算需要在 NLL 函数里面完成，但是实际上 NLL 函数的输入已经是对数似然概率了。即:
+
+> Input is expected to be log-probabilities.
+
+我们可以将 NLL 的输出表示为:
+
+$$
+\mathcal{l}(x,y) = L = \{l_1,\cdots, l_N\}^T,\, l_n = -x_{n,y_n}
+$$
+
+**Example**
+
+```
+input:
+y_pred: [ [1,2,3]
+          [4,5,6]
+          [7,8,9] ]
+y_true: [0,1,2]
+
+Output: -5.0 (-(1+5+9)/3, reduction = 'mean')
+```
+
+并且需要注意的是 input 的格式:
+
+- y_pred(Tensor): $(N,C)$.
+- y_true(Tensor): $(N)$ where each value is in range $[0, C-1]$.
+
+倘若 `y_pred.shape[0]` 与 `y_true.shape[0]` 不符，则会报错。

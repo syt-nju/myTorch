@@ -10,7 +10,7 @@ def sigmoid(x:MyTensor)->MyTensor:
     '''
     x.data = 1/(1 + np.exp(-x.data))
 
-def softmax(x:MyTensor, dim = 1)->MyTensor:
+def softmax(x:MyTensor, dim = 0)->MyTensor:
     '''
     实现softmax函数
     '''
@@ -19,6 +19,10 @@ def softmax(x:MyTensor, dim = 1)->MyTensor:
     exp_sum = np.sum(exp, axis = dim, keepdims = True)
     x.data = exp/exp_sum
     #x.data=np.exp(x.data)/np.sum(np.exp(x.data)),采用上述形式防止溢出
+
+def log_softmax(x: MyTensor, axis = None, keepdims = True):
+    x_sub_max = x.data - np.max(x.data, axis = axis, keepdims = keepdims)
+    x.data =  x_sub_max - np.log(np.sum(np.exp(x_sub_max), axis = axis, keepdims = keepdims))
 
 def ReLU(x:MyTensor)->MyTensor:
     '''
@@ -66,11 +70,16 @@ def NLL_loss(y_pred:MyTensor, y_true:MyTensor, reduction = 'mean'):
     '''
     实现负对数似然损失函数(NLL)
     '''
-    nll = -np.sum(y_true.data*np.log(y_pred.data))
+    if y_pred.ndim == 1:
+        nll = - y_pred.data[y_true.data[0].astype(int)]
+    elif y_pred.shape[0] != y_true.shape[0]:
+        raise ValueError("y_pred and y_true must have the same shape")
+    else:
+        nll = - y_pred.data[np.arange(y_pred.data.shape[0]), y_true.data.astype(int)]
     if reduction == 'mean':
-        return MyTensor.MyTensor(nll/y_pred.data.size)
+        return MyTensor.MyTensor(np.mean(nll))
     elif reduction == 'sum':
-        return MyTensor.MyTensor(nll)
+        return MyTensor.MyTensor(np.sum(nll))
     else:
         raise ValueError("reduction must be 'mean' or 'sum'")
    
@@ -113,7 +122,7 @@ if __name__ == "__main__":
             if func==sigmoid:
                 result_torch=torch.sigmoid(torch.tensor(X))
             elif func==softmax:
-                result_torch=torch.softmax(torch.tensor(X),dim=1)
+                result_torch=torch.softmax(torch.tensor(X),dim=0)
             elif func==ReLU:
                 result_torch=torch.relu(torch.tensor(X))
             elif func==tanh:
@@ -141,10 +150,18 @@ if __name__ == "__main__":
             elif func == NLL_loss:
                 result_torch = torch.nn.functional.nll_loss(torch.tensor(y_pred.astype(float)), torch.tensor(y_true).long(), reduction='sum')
             elif func == CrossEntropyLoss:
-                result_torch = torch.nn.functional.cross_entropy(torch.tensor(y_pred), torch.tensor(y_true), reduction='sum')
+                result_torch = torch.nn.functional.cross_entropy(torch.tensor(y_pred.astype(float)), torch.tensor(y_true.astype(float)), reduction='sum')
             else:
                 raise ValueError("Unknown function")
             judge = np.allclose(result, result_torch.numpy(), atol=1e-5)
             myAssert(judge, f"{func.__name__} function failed in round {i}", result, result_torch.numpy(),y_true,y_pred)
     
+# X = MyTensor.MyTensor(np.array([[1,2,3],[4,5,6],[7,8,9]]))
+# y = MyTensor.MyTensor(np.array([0,1,2]))
+# print(X.shape[0] == y.shape[0])
 
+# print(NLL_loss(X, y, reduction = 'mean'))
+
+# X1 = torch.tensor([[1,2,3],[4,5,6]], dtype = torch.float32)
+# y1 = torch.tensor([0,1], dtype = torch.long)
+# print(torch.nn.functional.nll_loss(X1, y1, reduction = 'mean'))
