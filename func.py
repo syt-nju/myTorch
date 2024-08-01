@@ -95,6 +95,7 @@ if __name__ == "__main__":
     #批量测试
     import torch
     from utils import myAssert
+    from utils import random_perturbation
     #构造函数list
     single_input_funcs=[sigmoid,softmax,ReLU,tanh,leaky_ReLU]#单输入函数.leaky_ReLU函数需要额外参数alpha,默认为1e-3
     double_input_funcs=[L1Loss,MSELoss,NLL_loss,CrossEntropyLoss]#双输入函数
@@ -112,7 +113,7 @@ if __name__ == "__main__":
             if func==sigmoid:
                 result_torch=torch.sigmoid(torch.tensor(X))
             elif func==softmax:
-                result_torch=torch.softmax(torch.tensor(X))
+                result_torch=torch.softmax(torch.tensor(X),dim=1)
             elif func==ReLU:
                 result_torch=torch.relu(torch.tensor(X))
             elif func==tanh:
@@ -123,6 +124,27 @@ if __name__ == "__main__":
                 raise ValueError("未知的函数")
             judge=np.allclose(result_np,result_torch.numpy(),atol=1e-5)
             myAssert(judge,f"{func.__name__}函数,在第{i}轮测试失败",result_np,result_torch.numpy())
+    print("单输入检查完成")
     #双输入检查还没写        
+    for i in range(epcho):
+        #随机生成0，1，2 三种类型标签
+        y_true=np.random.randint(0,3,(3,))
+        #对true进行扰动构造预测标签
+        y_pred=random_perturbation(y_true,(0,3),0.2)#以0.2的概率对每一项进行扰动
+        
+        for func in double_input_funcs:
+            result=func(MyTensor.MyTensor(y_pred),MyTensor.MyTensor(y_true),reduction='sum').data
+            if func == L1Loss:
+                result_torch = torch.nn.functional.l1_loss(torch.tensor(y_pred), torch.tensor(y_true), reduction='sum')
+            elif func == MSELoss:
+                result_torch = torch.nn.functional.mse_loss(torch.tensor(y_pred.astype(float)), torch.tensor(y_true.astype(float)), reduction='sum')
+            elif func == NLL_loss:
+                result_torch = torch.nn.functional.nll_loss(torch.tensor(y_pred.astype(float)), torch.tensor(y_true).long(), reduction='sum')
+            elif func == CrossEntropyLoss:
+                result_torch = torch.nn.functional.cross_entropy(torch.tensor(y_pred), torch.tensor(y_true), reduction='sum')
+            else:
+                raise ValueError("Unknown function")
+            judge = np.allclose(result, result_torch.numpy(), atol=1e-5)
+            myAssert(judge, f"{func.__name__} function failed in round {i}", result, result_torch.numpy(),y_true,y_pred)
     
 

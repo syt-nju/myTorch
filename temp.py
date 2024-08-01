@@ -4,8 +4,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-#构造一个二维np
-a = np.array([[1.0,2.0,3.0],[4.0,5.0,6.0]])
-#转换为torch
-b = torch.tensor(a)
-print(torch.softmax(b,dim=0))
+# #构造一个二维np
+# a = np.array([[1.0,2.0,3.0],[4.0,5.0,6.0]])
+# #转换为torch
+# b = torch.tensor(a)
+# print(torch.softmax(b,dim=0))
+for i in range(10):
+    print(np.random.randint(0,3,(3,)))
