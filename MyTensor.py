@@ -1,7 +1,9 @@
 #基于numpy 构建基本的Tensor类
-from typing import Union, Tuple
+from typing import Union, Tuple,Optional
 import numpy as np
-from autograd import no_grad, is_grad_enabled  
+from autograd import no_grad, is_grad_enabled 
+from utils import myAssert
+READSIGN=114514
 #构建基础版Tensor类
 #meta 类，定义一些需要的基本属性和简单初始化 
 class TensorMeta(type):
@@ -13,40 +15,46 @@ class TensorMeta(type):
         初始化Tensor类,执行顺序高于子类init
         '''
         super(TensorMeta, cls).__init__(name, bases, attrs)
-        cls.data = None #np矩阵
-        cls.grad = None 
-        cls.requires_grad = False   #作为input的时候不需要梯度，作为其它的时候需要梯度
-        cls.shape = None
-        cls.device = "cpu" #规定在cpu或者gpu上运行
-        cls.dtype = float
-        cls.dim = None
+        
 
-# TODO: 实现计算图类
-class ComputationalGraph:
-    '''
-    计算图类，可以理解为一个链表，每个节点是一个操作
-    需要实现的方法:
-    1. 添加图节点
-    2. 释放节点
-    '''
-    NotImplementedError
+#目前就是个list，以后可能会加入更多的属性
+class ComputationalGraph():
+    node_list=list()
+    def __init__(self):
+        '''
+        初始化计算图
+        '''
+        super().__init__()
+    @classmethod
+    def add_node(cls, node):
+        '''
+        添加节点
+        '''
+        cls.node_list.append(node)
+    @classmethod
+    def clear(cls):
+        '''
+        清空计算图
+        '''
+        cls.node_list.clear()
+
+    
+
 
 
 class MyTensor(metaclass=TensorMeta):
     '''
     自定义的Tensor类
     '''
-    def __init__(self, data, requires_grad=False, device="cpu", dtype=float):
+    def __init__(self, data:np.array, requires_grad=False, device="cpu", dtype=float):
         '''
         初始化Tensor
         '''
         self.data = np.array(data, dtype=dtype)
         self.device = device
-        self.dtype = dtype
-        self.dim = data.ndim
-        self.shape = data.shape
-
-        self.requires_grad = requires_grad and is_grad_enabled()
+        self.requires_grad = requires_grad  
+        self.father_Op:Op=None
+        
         if self.requires_grad and self.data.dtype != np.float:
             raise TypeError("only float tensor can require gradients")
         if self.requires_grad:
@@ -66,6 +74,7 @@ class MyTensor(metaclass=TensorMeta):
         '''
         return f"MyTensor({self.data})"
     #注意，为了简单处理，我强制要求+-* @所有的操作数都是MyTensor类型，除法被除数必须Tensor类型
+    #注意，此时的计算是直接对data进行操作，不涉及梯度传播
     def __add__(self, other):
         '''
         重写加法运算
@@ -141,6 +150,7 @@ class MyTensor(metaclass=TensorMeta):
         转置
         '''
         self.data = np.transpose(self.data)
+        return self
 
     @property
     def shape(self):
@@ -192,7 +202,7 @@ class MyTensor(metaclass=TensorMeta):
     @property
     def is_leaf(self)->bool:
         '''
-        判断是否是叶子节点
+        判断是否是叶子节点(基于前向传播的DAG图)
         '''
         NotImplementedError
 
@@ -221,31 +231,120 @@ class MyTensor(metaclass=TensorMeta):
 
             
 #TODO: 实现基本的操作类,支持梯度传播
-class BinaryOp(MyTensor):
-    def __init__(self, x:  MyTensor, y:MyTensor) -> None:
-        assert x.device == y.device, "device not match"
-        self.device = x.device
-        NotImplementedError
-    
-    def forward(self, x: MyTensor, y: MyTensor)->np.ndarray:
+#区别于学长的torch，我通读代码后，发现实际上算子并不需要继承自Tensor，实际使用的时候，算子只需要对device，require_grad进行要求即可
+#所以这里新建一个算子类，无需继承自算子类
+class Op:
+    '''
+    算子类
+    '''
+    device='cpu'
+    def __init__(self, device: str = "cpu", requires_grad: bool = False) -> None:
+        self.requires_grad = requires_grad
+        self.last=list()
+
+    @classmethod
+    def change_device(cls, device: str) -> None:
+        '''
+        改变算子的设备
+        '''
+        cls.device = device
+    def forward(self, *args: Tuple[MyTensor]) -> MyTensor:
+        '''
+        forward 流程：
+            1.计算并创建最新的Tensor
+            2.将当前算子添加到计算图中
+            3.添加最新的Tensor的father_Op属性
+            4.记录算子的输入到self.last
+        '''
         NotImplementedError
 
-    def backward(self, x: MyTensor, grad: np.ndarray)->np.ndarray:
+    def grad_func(self, grad: np.ndarray) -> Tuple[np.ndarray]:
         '''
-        x: 下游节点
-        grad: 上游传入该节点的梯度
+        梯度传播
         '''
         NotImplementedError
 
-class Add(BinaryOp):
+
+class Sum(Op):
     '''
     加法算子, 继承自BinaryOp
     '''
+    def forward(self, *args) -> MyTensor:
+        '''
+        前向传播
+        '''
+        #检查：shape是否相同;device是否相同
+        myAssert(args.__len__() > 1, "Sum must have at least 2 arguments")
+        for arg in args:
+            myAssert(arg.shape == args[0].shape, f"{arg}shape must be the same as {args[0]}", arg, args[0])
+        myAssert(all(arg.device == self.device for arg in args), "device must be the same",self.device)
+        
+        #算出结果
+        result=np.zeros_like(args[0].data)
+        for arg in args:
+            result+=arg.data
+        z = MyTensor(result, requires_grad=self.requires_grad, device=self.device)
+        ComputationalGraph.add_node(self)
+        z.father_Op = self
+        self.last.extend(list(args))
+        return z
+    def grad_func(self, node:MyTensor,grad: np.ndarray)->np.ndarray: 
+        '''
+        @param
+            node: MyTensor 对node求导
+            grad: np.ndarray 上游传来的梯度
+        @return
+            返回对应的导数值，为np.ndarray
+        '''
+        return grad*np.ones_like(node.data)
+class Mul(Op):
+    def forward(self, *args) -> MyTensor:
+        '''
+        前向传播
+        '''
+        #检查：shape是否相同;device是否相同
+        myAssert(args.__len__()==2, "Mul must have 2 arguments")
+        for arg in args:
+            myAssert(arg.shape == args[0].shape, f"{arg}shape must be the same as {args[0]}", arg, args[0])
+        myAssert(all(arg.device == self.device for arg in args), "device must be the same",self.device)
+        
+        #算出结果
+        result=args[0].data*args[1].data
+        z = MyTensor(result, requires_grad=self.requires_grad, device=self.device)
+        ComputationalGraph.add_node(self)
+        z.father_Op = self
+        self.last.extend(list(args))
+        return z
+    def grad_func(self, node:MyTensor,grad: np.ndarray)->np.ndarray: 
+        '''
+        @param
+            node: MyTensor 对node求导
+            grad: np.ndarray 上游传来的梯度
+        @return
+            返回对应的导数值，为np.ndarray
+        '''
+        if node==self.last[0]:
+            return grad*self.last[1].data
+        elif node==self.last[1]:
+            return grad*self.last[0].data
+        else:
+            raise ValueError("something wrong,check self.last")
+if __name__ == "__main__":
+    #测试
+    # Test MyTensor class
+    data = np.array([1, 2, 3])
+    tensor = MyTensor(data)
+    print(tensor)  # Output: MyTensor([1 2 3])
 
-    def forward(self, x: MyTensor, y: MyTensor)->np.ndarray:
-        return x.data + y.data
-
-    def backward(self, x: MyTensor, grad: np.ndarray)->np.ndarray:
-        return grad[...]
-    
-# TODO 实现其它常用算子
+    # Test addition operation
+    a = MyTensor(np.array([1, 2, 3]))
+    b = MyTensor(np.array([4, 5, 6]))
+    c= MyTensor(np.array([7, 8, 9]))
+    add_op = Sum()
+    result = add_op.forward(a,b,c)
+    print(result)  # Output: MyTensor([5 7 9])
+    print(result.requires_grad)  # Output: False
+    print(result.device)  # Output: cpu
+    print(result.father_Op)  # Output: None
+    print(add_op.last)  # Output: [a, b, c]
+    print(ComputationalGraph.node_list)  # Output: [add_op]
