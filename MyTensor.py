@@ -37,6 +37,12 @@ class ComputationalGraph():
         清空计算图
         '''
         cls.node_list.clear()
+    @classmethod
+    def index(cls, node):
+        '''
+        查找节点,返回index
+        '''
+        return cls.node_list.index(node)
 
     
 
@@ -54,11 +60,12 @@ class MyTensor(metaclass=TensorMeta):
         self.device = device
         self.requires_grad = requires_grad  
         self.father_Op:Op=None
+
         
-        if self.requires_grad and self.data.dtype != np.float:
+        if self.requires_grad and self.data.dtype != float:
             raise TypeError("only float tensor can require gradients")
         if self.requires_grad:
-            self.grad = np.zeros_like(data)
+            self.grad = np.zeros_like(data,dtype=dtype)
         else:
             self.grad = None
 
@@ -204,14 +211,23 @@ class MyTensor(metaclass=TensorMeta):
         '''
         判断是否是叶子节点(基于前向传播的DAG图)
         '''
-        NotImplementedError
+        if self.father_Op==None:
+            return True
+        else:
+            return False
 
-    def backward(self, retain_graph=False):
+    def backward(self):
         '''
         反向传播
-        retain_graph: 是否保留计算图
         '''
-        NotImplementedError
+        #找到Tensor它的产生者的位置
+        myAssert(self.father_Op==ComputationalGraph.node_list[-1],"我们强制要求有且仅有一个Tensor作为输出，其生成它的op必须是op list中的最后一个，这里违背了这个规则")
+        #把自己的梯度设置为1，用于bp
+        self.grad=np.ones_like(self.data)
+        for op in ComputationalGraph.node_list[::-1]:
+            op.op_backward()
+        #清空自己的梯度，最终输出一定不需要梯度
+        self.grad=None
     
     def zero_grad(self):
         '''
@@ -239,8 +255,8 @@ class Op:
     '''
     device='cpu'
     def __init__(self, device: str = "cpu", requires_grad: bool = False) -> None:
-        self.requires_grad = requires_grad
         self.last=list()
+        self.output=None
 
     @classmethod
     def change_device(cls, device: str) -> None:
@@ -255,6 +271,7 @@ class Op:
             2.将当前算子添加到计算图中
             3.添加最新的Tensor的father_Op属性
             4.记录算子的输入到self.last
+            5.记录算子的输出output
         '''
         NotImplementedError
 
@@ -263,6 +280,14 @@ class Op:
         梯度传播
         '''
         NotImplementedError
+    def op_backward(self):
+        '''
+        单个算子的反向传播
+        '''
+        for node in self.last:
+            if node.requires_grad:
+                node.grad+=self.grad_func(node,self.output.grad)
+            
 
 
 class Sum(Op):
@@ -283,10 +308,11 @@ class Sum(Op):
         result=np.zeros_like(args[0].data)
         for arg in args:
             result+=arg.data
-        z = MyTensor(result, requires_grad=self.requires_grad, device=self.device)
+        z = MyTensor(result, requires_grad= not all(not arg.requires_grad for arg in args), device=self.device) #暂定为，当且仅当所有输入的requires_grad=false，输出为requires_grad=false
         ComputationalGraph.add_node(self)
         z.father_Op = self
         self.last.extend(list(args))
+        self.output=z
         return z
     def grad_func(self, node:MyTensor,grad: np.ndarray)->np.ndarray: 
         '''
@@ -310,10 +336,11 @@ class Mul(Op):
         
         #算出结果
         result=args[0].data*args[1].data
-        z = MyTensor(result, requires_grad=self.requires_grad, device=self.device)
+        z = MyTensor(result,requires_grad= not all(not arg.requires_grad for arg in args), device=self.device)
         ComputationalGraph.add_node(self)
         z.father_Op = self
         self.last.extend(list(args))
+        self.output=z
         return z
     def grad_func(self, node:MyTensor,grad: np.ndarray)->np.ndarray: 
         '''
@@ -331,20 +358,14 @@ class Mul(Op):
             raise ValueError("something wrong,check self.last")
 if __name__ == "__main__":
     #测试
-    # Test MyTensor class
-    data = np.array([1, 2, 3])
-    tensor = MyTensor(data)
-    print(tensor)  # Output: MyTensor([1 2 3])
-
-    # Test addition operation
-    a = MyTensor(np.array([1, 2, 3]))
-    b = MyTensor(np.array([4, 5, 6]))
-    c= MyTensor(np.array([7, 8, 9]))
-    add_op = Sum()
-    result = add_op.forward(a,b,c)
-    print(result)  # Output: MyTensor([5 7 9])
-    print(result.requires_grad)  # Output: False
-    print(result.device)  # Output: cpu
-    print(result.father_Op)  # Output: None
-    print(add_op.last)  # Output: [a, b, c]
-    print(ComputationalGraph.node_list)  # Output: [add_op]
+    #对整个图的构造进行测试
+    #y=ax+b 测试
+    x=MyTensor(np.array([1,2,3]),requires_grad=False)
+    a=MyTensor(np.array([1,1,1]),requires_grad=True)
+    b=MyTensor(np.array([7,8,9]),requires_grad=True)
+    add=Sum()
+    mul=Mul()
+    temp=mul.forward(a,x)
+    y=add.forward(temp,b)
+    y.backward()
+    print(a.grad,b.grad)
