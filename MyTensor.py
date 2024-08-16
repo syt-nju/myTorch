@@ -356,10 +356,44 @@ class Mul(Op):
             return grad*self.last[0].data
         else:
             raise ValueError("something wrong,check self.last")
+class MatMul(Op):
+    def forward(self, *args) -> MyTensor:
+        '''
+        前向传播
+        '''
+        #检查：shape是否相同;device是否相同
+        myAssert(args.__len__()==2, "MatMul must have 2 arguments")
+        myAssert(args[0].ndim==2 and args[1].ndim==2,"MatMul must have 2-D tensor")
+        myAssert(args[0].shape[1]==args[1].shape[0],"MatMul shape error")
+        myAssert(all(arg.device == self.device for arg in args), "device must be the same",self.device)
+        
+        #算出结果
+        result=np.matmul(args[0].data,args[1].data)
+        z = MyTensor(result,requires_grad= not all(not arg.requires_grad for arg in args), device=self.device)
+        ComputationalGraph.add_node(self)
+        z.father_Op = self
+        self.last.extend(list(args))
+        self.output=z
+        return z
+    def grad_func(self, node:MyTensor,grad: np.ndarray)->np.ndarray: 
+        '''
+        @param
+            node: MyTensor 对node求导
+            grad: np.ndarray 上游传来的梯度
+        @return
+            返回对应的导数值，为np.ndarray
+        '''
+        if node==self.last[0]:
+            return np.matmul(grad,self.last[1].data.T)
+        elif node==self.last[1]:
+            return np.matmul(self.last[0].data.T,grad)
+        else:
+            raise ValueError("something wrong,check self.last")
 if __name__ == "__main__":
     #测试
     #对整个图的构造进行测试
     #y=ax+b 测试
+    
     x=MyTensor(np.array([1,2,3]),requires_grad=False)
     a=MyTensor(np.array([1,1,1]),requires_grad=True)
     b=MyTensor(np.array([7,8,9]),requires_grad=True)
@@ -367,5 +401,20 @@ if __name__ == "__main__":
     mul=Mul()
     temp=mul.forward(a,x)
     y=add.forward(temp,b)
-    y.backward()
+    print(y)
+    #z=x(ax+b)
+    new_mul=Mul()
+    z = new_mul.forward(y, x)
+    print(z)
+    z.backward()
     print(a.grad,b.grad)
+    print("测试结束")
+    #测试矩阵乘法
+    ComputationalGraph.clear()
+    x=MyTensor(np.array([[1,2,3],[4,5,6]]),requires_grad=False)
+    y=MyTensor(np.array([[1,2],[1,2],[2,1]]),requires_grad=True)
+    mul=MatMul()   
+    z=mul.forward(x,y)
+    print(z)
+    z.backward()
+    print(y.grad)
