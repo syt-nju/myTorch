@@ -286,6 +286,9 @@ class Op:
         '''
         for node in self.last:
             if node.requires_grad:
+                
+                     
+                print(f'node:{node} grad_shape:{node.grad.shape}\n 上游node:{self.output} grad_shape:{self.output.grad.shape}')
                 node.grad+=self.grad_func(node,self.output.grad)
             
 
@@ -300,14 +303,19 @@ class Sum(Op):
         '''
         #检查：shape是否相同;device是否相同
         myAssert(args.__len__() > 1, "Sum must have at least 2 arguments")
-        for arg in args:
-            myAssert(arg.shape == args[0].shape, f"{arg}shape must be the same as {args[0]}", arg, args[0])
+        #考虑bias的情况，这里允许出现不同shape的情况，但是要求能够广播
+        # for arg in args:
+        #     myAssert(arg.shape == args[0].shape, f"{arg}shape must be the same as {args[0]}", arg, args[0])
         myAssert(all(arg.device == self.device for arg in args), "device must be the same",self.device)
         
         #算出结果
-        result=np.zeros_like(args[0].data)
-        for arg in args:
+        #这里我希望它自己会广播，于是我采用笨一点的硬加的方法
+        #a+=b这中用法要保证b是被广播的,调用尽量把大的放前面
+        result=args[0].data
+        for arg in args[1:]:
             result+=arg.data
+        
+        
         z = MyTensor(result, requires_grad= not all(not arg.requires_grad for arg in args), device=self.device) #暂定为，当且仅当所有输入的requires_grad=false，输出为requires_grad=false
         ComputationalGraph.add_node(self)
         z.father_Op = self
@@ -368,6 +376,7 @@ class MatMul(Op):
         myAssert(all(arg.device == self.device for arg in args), "device must be the same",self.device)
         
         #算出结果
+        self.a_one_dimen,self.b_one_dimen=args[0].ndim<2,args[1].ndim<2#记录是否是一维,由于其一维matmul的特殊性需要进行特殊处理
         result=np.matmul(args[0].data,args[1].data)
         z = MyTensor(result,requires_grad= not all(not arg.requires_grad for arg in args), device=self.device)
         ComputationalGraph.add_node(self)
@@ -377,6 +386,8 @@ class MatMul(Op):
         return z
     def grad_func(self, node:MyTensor,grad: np.ndarray)->np.ndarray: 
         '''
+        此处处理比较多，参考文献
+        https://welts.xyz/2022/04/26/broadcast/
         @param
             node: MyTensor 对node求导
             grad: np.ndarray 上游传来的梯度
