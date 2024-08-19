@@ -7,8 +7,13 @@ class MyLinearLayer():
         if initial_policy == 'random':
             self.weight = MyTensor(np.random.randn(fan_in,fan_out),requires_grad=True)
             self.bias = MyTensor(np.random.randn(fan_out),requires_grad=True)
+        if initial_policy == 'zeros':
+            self.weight = MyTensor(np.zeros((fan_in,fan_out)),requires_grad=True)
+            self.bias = MyTensor(np.zeros(fan_out),requires_grad=True)
     def forward(self,x:MyTensor)->MyTensor:
         #检查形状
+        if x.data.ndim == 1:
+            x.data = x.data.reshape(1,-1)
         myAssert(x.shape[1] == self.weight.shape[0],'shape not match')
         
         matmul=MatMul()
@@ -19,12 +24,11 @@ class MyLinearLayer():
     
 if __name__ == "__main__":
     #测试MyLinearLayer
-    layer = MyLinearLayer(3,2)
-    x = MyTensor(np.random.randn(2,3),requires_grad=False)
+    layer = MyLinearLayer(1,3,initial_policy='zeros')
+    x = MyTensor([9],requires_grad=False)
     y = layer.forward(x)
     y.backward()
     print(layer.weight.grad)
-    print(x.data)
     print(layer.bias.grad)
     
         
