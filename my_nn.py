@@ -22,9 +22,11 @@ if __name__ == "__main__":
     layer = MyLinearLayer(3,2)
     x = MyTensor(np.random.randn(2,3),requires_grad=False)
     y = layer.forward(x)
-    print(y.data)
     y.backward()
-    print(layer.weight.grad.data)
+    print(layer.weight.grad)
+    print(x.data)
+    print(layer.bias.grad)
+    
         
         
         

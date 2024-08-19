@@ -286,11 +286,18 @@ class Op:
         '''
         for node in self.last:
             if node.requires_grad:
-                
-                     
-                print(f'node:{node} grad_shape:{node.grad.shape}\n 上游node:{self.output} grad_shape:{self.output.grad.shape}')
-                node.grad+=self.grad_func(node,self.output.grad)
-            
+                #handle broadcast
+                add_grad=self.grad_func(node,self.output.grad)
+                if node.grad.shape!=add_grad.shape:
+                    #找到被广播的维度
+                    broadcast_axis=[-i for i in range(1,add_grad.ndim+1) if add_grad.shape[-i]==1]     
+                    add_grad=np.sum(add_grad,axis=tuple(broadcast_axis),keepdims=True)#求均值压缩
+                    if node.grad.ndim<add_grad.ndim:
+                        add_grad=np.sum(add_grad,axis=tuple(range(add_grad.ndim-node.grad.ndim)))#把延长的维度进行压缩，这里无所谓sum还是mean，理想状态下应该前几个维度大小都为1
+                node.grad+=add_grad
+                    
+                    
+
 
 
 class Sum(Op):
@@ -394,6 +401,7 @@ class MatMul(Op):
         @return
             返回对应的导数值，为np.ndarray
         '''
+        NotImplementedError#tmd这里还有广播的问题，待解决
         if node==self.last[0]:
             return np.matmul(grad,self.last[1].data.T)
         elif node==self.last[1]:
