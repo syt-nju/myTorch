@@ -3,6 +3,8 @@ from typing import Union, Tuple,Optional
 import numpy as np
 from autograd import no_grad, is_grad_enabled 
 from utils import myAssert
+import random
+
 READSIGN=114514
 #构建基础版Tensor类
 #meta 类，定义一些需要的基本属性和简单初始化 
