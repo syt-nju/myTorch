@@ -353,8 +353,7 @@ class Mul(Op):
         
         #算出结果
         result=args[0].data*args[1].data
-        #记录下是否出现矩阵一维导致的broadcast
-        self.is_a_broadcast,self.is_b_broadcast=args[0].ndim<2,args[1].ndim<2
+        
         z = MyTensor(result,requires_grad= not all(not arg.requires_grad for arg in args), device=self.device)
         ComputationalGraph.add_node(self)
         z.father_Op = self
@@ -369,17 +368,10 @@ class Mul(Op):
         @return
             返回对应的导数值，为np.ndarray
         '''
-        #规范上游梯度的ndim问题
-        if self.is_a_broadcast:
-            np.expand_dims(grad,axis=0)
-        if self.is_b_broadcast:
-            np.expand_dims(grad,axis=-1)
-            
-            
         if node==self.last[0]:
-            grad@self.last[1].data.swapaxes(-1,-2)
+            return grad*self.last[1].data
         elif node==self.last[1]:
-            return self.last[0].data.swaxaxes(-1,-2)@grad
+            return grad*self.last[0].data
         else:
             raise ValueError("something wrong,check self.last")
 class MatMul(Op):
@@ -395,6 +387,9 @@ class MatMul(Op):
         
         #算出结果
         self.a_one_dimen,self.b_one_dimen=args[0].ndim<2,args[1].ndim<2#记录是否是一维,由于其一维matmul的特殊性需要进行特殊处理
+        #记录下是否出现矩阵一维导致的broadcast
+        self.is_a_broadcast,self.is_b_broadcast=args[0].ndim<2,args[1].ndim<2
+        
         result=np.matmul(args[0].data,args[1].data)
         z = MyTensor(result,requires_grad= not all(not arg.requires_grad for arg in args), device=self.device)
         ComputationalGraph.add_node(self)
@@ -412,13 +407,20 @@ class MatMul(Op):
         @return
             返回对应的导数值，为np.ndarray
         '''
-        NotImplementedError#tmd这里还有广播的问题，待解决
+               #规范上游梯度的ndim问题
+        if self.is_a_broadcast:
+            np.expand_dims(grad,axis=0)
+        if self.is_b_broadcast:
+            np.expand_dims(grad,axis=-1)
+            
+            
         if node==self.last[0]:
-            return np.matmul(grad,self.last[1].data.T)
+            grad@self.last[1].data.swapaxes(-1,-2)
         elif node==self.last[1]:
-            return np.matmul(self.last[0].data.T,grad)
+            return self.last[0].data.swapaxes(-1,-2)@grad
         else:
             raise ValueError("something wrong,check self.last")
+
 if __name__ == "__main__":
     #测试
     #对整个图的构造进行测试
