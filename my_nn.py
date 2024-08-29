@@ -4,7 +4,7 @@ from MyTensor import MyTensor,Sum,Mul,MatMul
 
 class MyLinearLayer():
     def __init__(self,fan_in:int,fan_out:int,initial_policy:str = 'random') -> None:
-        if initial_policy == 'random':
+        if initial_policy == 'random':#正态分布初始化
             self.weight = MyTensor(np.random.randn(fan_in,fan_out),requires_grad=True)
             self.bias = MyTensor(np.random.randn(fan_out),requires_grad=True)
         if initial_policy == 'zeros':

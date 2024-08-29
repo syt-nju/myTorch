@@ -407,9 +407,9 @@ class MatMul(Op):
         @return
             返回对应的导数值，为np.ndarray
         '''
-               #规范上游梯度的ndim问题
+        #规范上游梯度的ndim问题
         if self.is_a_broadcast:
-            np.expand_dims(grad,axis=0)
+            np.expand_dims(grad,axis=   0)
         if self.is_b_broadcast:
             np.expand_dims(grad,axis=-1)
             
@@ -434,6 +434,7 @@ if __name__ == "__main__":
     temp=mul.forward(a,x)
     y=add.forward(temp,b)
     print(y)
+    print(a.grad,b.grad)
     #z=x(ax+b)
     new_mul=Mul()
     z = new_mul.forward(y, x)
