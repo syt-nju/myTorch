@@ -5,7 +5,7 @@ from autograd import no_grad, is_grad_enabled
 from utils import myAssert
 import random
 
-READSIGN=114514
+READSIGN=114514#作为标记，无实际意义
 #构建基础版Tensor类
 #meta 类，定义一些需要的基本属性和简单初始化 
 class TensorMeta(type):
@@ -415,7 +415,7 @@ class MatMul(Op):
             
             
         if node==self.last[0]:
-            grad@self.last[1].data.swapaxes(-1,-2)
+            return grad@self.last[1].data.swapaxes(-1,-2)
         elif node==self.last[1]:
             return self.last[0].data.swapaxes(-1,-2)@grad
         else:
