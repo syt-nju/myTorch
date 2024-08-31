@@ -54,11 +54,11 @@ class MyTensor(metaclass=TensorMeta):
     '''
     自定义的Tensor类
     '''
-    def __init__(self, data:np.array, requires_grad=False, device="cpu", dtype=float):
+    def __init__(self, data:np.ndarray, requires_grad=False, device="cpu", dtype=float):
         '''
         初始化Tensor
         '''
-        self.data = np.array(data, dtype=dtype)
+        self.data = data.astype(dtype)
         self.device = device
         self.requires_grad = requires_grad  
         self.father_Op:Op=None
