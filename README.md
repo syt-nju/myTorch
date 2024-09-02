@@ -47,23 +47,30 @@ MyTensor([ 8. 10. 12.])
 [1. 2. 3.] [1. 1. 1.]
 ```
 
-### 线性层
+### 线性层及优化器等
 
 基于矩阵乘法算子构成的线性层
 
 ```
-    layer = MyLinearLayer(1,3,initial_policy='zeros')
-    x = MyTensor([9],requires_grad=False)
-    y = layer.forward(x)
-    y.backward()
-    print(layer.weight.grad)
-    print(layer.bias.grad)
+    #测试BGD
+    # #构造y=3x+2的模拟
+    x=np.array(range(10)).reshape(-1,1)
+    y_true=3*x+2+np.random.randn(10,1)*0.001
+    layer=my_nn.MyLinearLayer(1,1,initial_policy='zeros')
+    optimizer=BGD([layer.weight,layer.bias],lr=0.01)
+    for i in range(1000):
+        y_pred=layer.forward(MyTensor.MyTensor(x))
+        
+        loss=MSELoss().forward(y_pred,MyTensor.MyTensor(y_true))
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+    print(layer.weight.data,layer.bias.data)
 ```
 
 输出
 
 ```
-[[9. 9. 9.]]
-[1. 1. 1.]
+[[3.00085765]] [1.9946551]
 ```
 
