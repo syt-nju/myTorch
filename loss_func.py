@@ -47,11 +47,25 @@ class MSELoss(LossFunc):
             raise ValueError("reduction must be 'mean' or 'sum'")
         
 if __name__ == "__main__":
-    y_pred = MyTensor(np.array([1,2,3,3]),requires_grad=True)
-    y_true = np.array([1,2,3,4])
-    loss=MSELoss()
-    result=loss.forward(y_pred,y_true)
-    result.backward()
-    print(y_pred.grad)
-        
+    # #简单测试
+    # y_pred = MyTensor(np.array([1,2,3,3]),requires_grad=True)
+    # y_true = np.array([1,2,3,4])
+    # loss=MSELoss()
+    # result=loss.forward(y_pred,y_true)
+    # result.backward()
+    # print(y_pred.grad)
+    
+    #基于pytorch对比的测试
+    import torch
+    import torch.nn as nn
+    import my_nn
+    x=np.array(range(10)).reshape(-1,1)
+    y_true=3*x+2#+np.random.randn(10,1)*0.001
+    layer=my_nn.MyLinearLayer(1,1,initial_policy='zeros')
+    y_pred=layer.forward(MyTensor(x,requires_grad=True))
+    loss=MSELoss().forward(y_pred,MyTensor(y_true,requires_grad=False))
+    loss.backward()
+    print("grad",layer.weight.grad,layer.bias.grad)
+    
+
         

@@ -218,9 +218,11 @@ class MyTensor(metaclass=TensorMeta):
         else:
             return False
 
-    def backward(self):
+    def backward(self,retain_graph:bool=False):
         '''
         反向传播
+        @param
+            retain_graph: bool 是否保留计算图
         '''
         #找到Tensor它的产生者的位置
         myAssert(self.father_Op==ComputationalGraph.node_list[-1],"我们强制要求有且仅有一个Tensor作为输出，其生成它的op必须是op list中的最后一个，这里违背了这个规则")
@@ -230,6 +232,10 @@ class MyTensor(metaclass=TensorMeta):
             op.op_backward()
         #清空自己的梯度，最终输出一定不需要梯度
         self.grad=None
+        
+        #清空计算图
+        if not retain_graph:
+            ComputationalGraph.clear()
     
     def zero_grad(self):
         '''
