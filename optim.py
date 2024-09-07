@@ -22,7 +22,15 @@ class BGD(BaseOptimizer):
         super().__init__(parameters,lr)
     def step(self):
         for param in self.parameters:
-            param.grad
+            param.data -= self.lr*param.grad
+class SGD(BaseOptimizer):
+    '''
+        固定学习率的随机梯度下降
+    '''
+    def __init__(self,parameters,lr=0.01):
+        super().__init__(parameters,lr)
+    def step(self):
+        for param in self.parameters:
             param.data -= self.lr*param.grad
         
 if __name__=='__main__':
@@ -37,7 +45,6 @@ if __name__=='__main__':
         
         loss=MSELoss().forward(y_pred,MyTensor.MyTensor(y_true))
         loss.backward()
-        print("grad",layer.weight.grad,layer.bias.grad)
         optimizer.step()
         optimizer.zero_grad()
     print(layer.weight.data,layer.bias.data)

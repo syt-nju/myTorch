@@ -1,18 +1,11 @@
+import MyTensor
+import my_nn
 import numpy as np
-from torch import optim
-
-# 创建一个一维数组
-arr_1d = np.array([1, 2, 3])
-
-# 创建一个零维数组
-arr_0d = np.array(5)
-
-# 使用 atleast_2d 函数
-arr_2d_from_1d = np.atleast_2d(arr_1d)
-arr_2d_from_0d = np.atleast_2d(arr_0d)
-
-print(arr_2d_from_1d)
-print(arr_2d_from_1d.shape)
-print(arr_2d_from_0d)
-print(arr_2d_from_0d.shape)
-print(arr_1d)
+from torch.optim import SGD
+#构建一个y=ax+b的线性模型
+model=my_nn.MyLinearLayer(2,1,initial_policy='zeros')
+#创建一个形状为2，2的全1张量
+x=MyTensor.MyTensor(np.ones((2,2)),requires_grad=False)
+y=model.forward(x)
+y.backward()
+print(model.weight.grad)
