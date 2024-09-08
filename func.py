@@ -54,17 +54,25 @@ def L1Loss(y_pred:MyTensor, y_true:MyTensor, reduction = 'mean'):
     else:
         raise ValueError("reduction must be 'mean' or 'sum'")
 
-def MSELoss(y_pred:MyTensor, y_true:MyTensor, reduction = 'mean'):
+def MSELoss(y_pred: MyTensor, y_true: MyTensor, reduction='mean'):
     '''
-    实现均方误差损失函数(MSE)
+    实现均方误差损失函数 (MSE)
     '''
-    square_sum = np.sum(np.square(y_pred.data - y_true.data))
+    # 将数据转换为更高精度的浮点数类型（float64）
+    y_pred_data = y_pred.data.astype(np.float64)
+    y_true_data = y_true.data.astype(np.float64)
+    
+    # 计算平方和
+    square_sum = np.sum(np.square(y_pred_data - y_true_data))
+    
+    # 根据 reduction 参数返回结果
     if reduction == 'mean':
-        return MyTensor.MyTensor(square_sum/y_pred.data.size)
+        return MyTensor.MyTensor(square_sum / y_pred_data.size)
     elif reduction == 'sum':
         return MyTensor.MyTensor(square_sum)
     else:
         raise ValueError("reduction must be 'mean' or 'sum'")
+
 
 def NLL_loss(y_pred:MyTensor, y_true:MyTensor, reduction = 'mean'):
     '''

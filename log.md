@@ -70,3 +70,20 @@ Traceback (most recent call last):
     grad@self.last[1].data.swapaxes(-1,-2)
 numpy.AxisError: axis2: axis -2 is out of bounds for array of dimension 1
 ```
+
+## 2024.9.8
+
+尝试用 MLP 跑了一下 MNIST 数据集的训练
+
+```
+[1,     1]: loss: 92.804 , acc: 9.38 %
+/home/petrichor/code/myTorch/test/../MyTensor.py:399: RuntimeWarning: overflow encountered in matmul
+  result=np.matmul(args[0].data,args[1].data)
+/home/petrichor/code/myTorch/test/../MyTensor.py:399: RuntimeWarning: invalid value encountered in matmul
+  result=np.matmul(args[0].data,args[1].data)
+[1,   101]: loss: nan , acc: 9.75 %
+```
+
+感觉是 float 精度的问题。
+
+并且现在的 MLP 层数好像是固定的，后续可以考虑用基类的方法自定义 MLP。
