@@ -450,7 +450,7 @@ if __name__ == "__main__":
         result_torch.sum().backward()
         return result_torch, [i.grad.numpy() for i in input_torch]
 
-    def compare_with_torch(ops, *my_tensors):
+    def test(ops, *my_tensors):
         result = my_tensors[0]
         for i, op in enumerate(ops):
             if op == 'mul':
@@ -464,13 +464,11 @@ if __name__ == "__main__":
         my_tensor_data = [tensor.data for tensor in my_tensors]
         torch_result_val, torch_grads = torch_result(*my_tensor_data, ops=ops)
 
-        assert np.allclose(result.data, torch_result_val.detach().numpy(), atol=1e-5), \
-            f"Results do not match! Custom = {result.data}, Torch = {torch_result_val.detach().numpy()}"
+        assert np.allclose(result.data, torch_result_val.detach().numpy(), atol=1e-5), f"Results do not match! Custom = {result.data}, Torch = {torch_result_val.detach().numpy()}"
         for i, my_tensor in enumerate(my_tensors):
-            assert np.allclose(my_tensor.grad, torch_grads[i], atol=1e-5), \
-                f"Gradients do not match for input {i}! Custom = {my_tensor.grad}, Torch = {torch_grads[i]}"
+            assert np.allclose(my_tensor.grad, torch_grads[i], atol=1e-5), f"Gradients do not match for input {i}! Custom = {my_tensor.grad}, Torch = {torch_grads[i]}"
 
-    compare_with_torch(ops, a, b, c, x)
+    test(ops, a, b, c, x)
     print("所有结果和梯度匹配！")
 
 
