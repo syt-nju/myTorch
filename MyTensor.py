@@ -427,33 +427,66 @@ class MatMul(Op):
         else:
             raise ValueError("something wrong,check self.last")
 
+
 if __name__ == "__main__":
-    #测试
-    #对整个图的构造进行测试
-    #y=ax+b 测试
+
+    import torch
+    a = MyTensor(np.random.randn(1, 3), requires_grad=True)
+    b = MyTensor(np.random.randn(1, 3), requires_grad=True)
+    c = MyTensor(np.random.randn(1, 3), requires_grad=True)
+    x = MyTensor(np.random.randn(1, 3), requires_grad=True)
+    ops = ['mul', 'sum', 'sum']
+    def torch_result(*inputs, ops):
+        input_torch = [torch.tensor(i, dtype=torch.float32, requires_grad=True) for i in inputs]
+        result_torch = input_torch[0]
+
+        for i, op in enumerate(ops):
+            if op == 'mul':
+                result_torch = result_torch * input_torch[i + 1]
+            elif op == 'sum':
+                result_torch = result_torch + input_torch[i + 1]
+            else:
+                raise ValueError(f"Unsupported operation: {op}")
+        result_torch.sum().backward()
+        return result_torch, [i.grad.numpy() for i in input_torch]
+
+    def compare_with_torch(ops, *my_tensors):
+        result = my_tensors[0]
+        for i, op in enumerate(ops):
+            if op == 'mul':
+                result = Mul().forward(result, my_tensors[i + 1])
+            elif op == 'sum':
+                result = Sum().forward(result, my_tensors[i + 1])
+            else:
+                raise ValueError(f"Unsupported operation: {op}")
+
+        result.backward()
+        my_tensor_data = [tensor.data for tensor in my_tensors]
+        torch_result_val, torch_grads = torch_result(*my_tensor_data, ops=ops)
+
+        assert np.allclose(result.data, torch_result_val.detach().numpy(), atol=1e-5), \
+            f"Results do not match! Custom = {result.data}, Torch = {torch_result_val.detach().numpy()}"
+        for i, my_tensor in enumerate(my_tensors):
+            assert np.allclose(my_tensor.grad, torch_grads[i], atol=1e-5), \
+                f"Gradients do not match for input {i}! Custom = {my_tensor.grad}, Torch = {torch_grads[i]}"
+
+    compare_with_torch(ops, a, b, c, x)
+    print("所有结果和梯度匹配！")
+
+
+    def torch_resultmat(*input, op):
+        input_torch = [torch.tensor(i, dtype=torch.float32, requires_grad=True) for i in input]
+        result_torch = op(*input_torch)
+        result_torch.sum().backward()
+        return [i.grad.numpy() for i in input_torch]
+    for _ in range(100):
+        A = MyTensor(np.random.randn(3,3), requires_grad=True)
+        B = MyTensor(np.random.randn(3,3), requires_grad=True)
+        matmul = MatMul()
+        result = matmul.forward(A, B)
+        result.backward()
+        result_torch = torch_resultmat(A.data, B.data, op=torch.matmul)
+        assert np.allclose(A.grad, result_torch[0], atol = 1e-5), f"MatMul gradients do not match! Custom = {A.grad}, Torch = {result_torch[0]}"
+        assert np.allclose(B.grad, result_torch[1], atol = 1e-5), f"MatMul gradients do not match! Custom = {B.grad}, Torch = {result_torch[1]}"
     
-    x=MyTensor(np.array([1,2,3]),requires_grad=False)
-    a=MyTensor(np.array([1,1,1]),requires_grad=True)
-    b=MyTensor(np.array([7,8,9]),requires_grad=True)
-    add=Sum()
-    mul=Mul()
-    temp=mul.forward(a,x)
-    y=add.forward(temp,b)
-    print(y)
-    print(a.grad,b.grad)
-    #z=x(ax+b)
-    new_mul=Mul()
-    z = new_mul.forward(y, x)
-    print(z)
-    z.backward()
-    print(a.grad,b.grad)
-    print("测试结束")
-    #测试矩阵乘法
-    ComputationalGraph.clear()
-    x=MyTensor(np.array([[1,2,3],[4,5,6]]),requires_grad=False)
-    y=MyTensor(np.array([[1,2],[1,2],[2,1]]),requires_grad=True)
-    mul=MatMul()   
-    z=mul.forward(x,y)
-    print(z)
-    z.backward()
-    print(y.grad)
+    print("MatMul 梯度匹配！")
