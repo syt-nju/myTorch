@@ -3,7 +3,7 @@ from torch import nn,tensor,float32
 from torch.optim import Adagrad,Adam
 from torch.nn import MSELoss
 #构造y=3x+2
-#abc
+#666
 x=np.array(range(10)).reshape(-1,1)
 x=tensor(x,dtype=float32)
 y_true=3*x+2+np.random.randn(10,1)*0.001
