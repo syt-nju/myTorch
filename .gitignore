@@ -96,15 +96,13 @@ venv.bak/
 .spyderproject
 .spyproject
 
-# Rope project settings
-.ropeproject
+# Rope projec
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
 
-# mkdocs documentation
-/site
+# C extensions
+*.so
 
-# mypy
-.mypy_cache/
-
-temp.py
-
-test/dataset/
+#
