@@ -20,3 +20,4 @@ for i in range(100000):
         print("epcho",i)
         break
 print("weight",model.weight.data,"bias",model.bias.data)
+
