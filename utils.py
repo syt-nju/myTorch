@@ -17,7 +17,7 @@ def myAssert(judge: bool, message: str, *args, **kwargs):
             else:
                 print(i)
         assert judge, message
-def random_perturbation(array, perturbation_range, probability):
+def random_perturbation(array:np.ndarray, perturbation_range:tuple, probability:float)->np.ndarray:
     """
     对一维NumPy数组进行随机扰动，使得每一项都有一定概率变成给定范围的另外一个整数
 
