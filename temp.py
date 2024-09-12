@@ -2,7 +2,6 @@ import numpy as np
 from torch import nn,tensor,float32
 from torch.optim import Adagrad,Adam
 from torch.nn import MSELoss
-#jalkdajljds
 #构造y=3x+2
 x=np.array(range(10)).reshape(-1,1)
 x=tensor(x,dtype=float32)
