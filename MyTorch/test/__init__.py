@@ -1,7 +1,7 @@
 '''
-Create by SkywarSigil
-Date: 2023-07-25 16:00:00
-Last Modified: 2023-07-25 16:10:00
+Create by SkywardSigil
+Date: 2024-09-14 16:00:00
+Last Modified: 2024-09-14 16:10:00
 Description:
 This file is used to set the root path of the project
 and add it to the system path.
