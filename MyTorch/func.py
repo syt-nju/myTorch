@@ -111,8 +111,8 @@ def CrossEntropyLoss(y_pred:MyTensor, y_true:MyTensor, reduction = 'sum'):
 if __name__ == "__main__":
     #批量测试
     import torch
-    from utils import myAssert
-    from utils import random_perturbation
+    from utils.utils import myAssert
+    from utils.utils import random_perturbation
     #构造函数list
     single_input_funcs=[sigmoid,softmax,ReLU,tanh,leaky_ReLU]#单输入函数.leaky_ReLU函数需要额外参数alpha,默认为1e-3
     double_input_funcs=[L1Loss,MSELoss,NLL_loss,CrossEntropyLoss]#双输入函数

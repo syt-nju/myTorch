@@ -2,7 +2,7 @@
 from typing import Union, Tuple,Optional
 import numpy as np
 from autograd import no_grad, is_grad_enabled 
-from utils import myAssert
+from utils.utils import myAssert
 import random
 
 READSIGN=114514#作为标记，无实际意义

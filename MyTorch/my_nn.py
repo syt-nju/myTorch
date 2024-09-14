@@ -1,7 +1,6 @@
-from utils import myAssert
+from utils.utils import *
+from MyTensor import MyTensor,MatMul,Sum
 import numpy as np
-from MyTensor import MyTensor,Sum,Mul,MatMul
-
 class MyLinearLayer():
     def __init__(self,fan_in:int,fan_out:int,initial_policy:str = 'random') -> None:
         if initial_policy == 'random':#正态分布初始化
