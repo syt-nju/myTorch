@@ -1,5 +1,4 @@
-import sys
-sys.path.append("../")
+import __init__
 import MyTensor
 from my_nn import MLP
 from optim import BGD
