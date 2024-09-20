@@ -18,16 +18,34 @@ class BGD(BaseOptimizer):
     '''
         固定学习率的批量梯度下降
     '''
-    def __init__(self,parameters,lr=0.01):
+    def __init__(self,parameters,lr=1e-3):
         super().__init__(parameters,lr)
     def step(self):
         for param in self.parameters:
             param.data -= self.lr*param.grad
 class SGD(BaseOptimizer):
     '''
-        固定学习率的随机梯度下降
+        包含多个参数的随机梯度下降
+        @params: _params_t,
+        lr: float = ..., 初始学习率
+        momentum: float = ..., 动量系数
+        weight_decay: float = ..., L2正则化项系数
+        nesterov: bool = ..., 是否使用Nesterov动量
     '''
-    NotImplementedError
+    def __init__(self,parameters,lr=1e-3,momentum=0.0,weight_decay=0.0,nesterov=False):
+        super().__init__(parameters,lr)
+        self.momentum = momentum
+        self.weight_decay = weight_decay
+        self.nesterov = nesterov
+        self.v = [np.zeros_like(param.data) for param in parameters] #动量
+    def step(self):
+        for i,param in enumerate(self.parameters):
+            #pytorch原汁原味写法，和动量法论文表述不太一样，有点恶心心
+            grad = param.grad+param.data*self.weight_decay
+            self.v[i] = self.momentum*self.v[i]+grad
+            if self.nesterov:
+                grad+=self.momentum*self.v[i]
+            param.data -= grad*self.lr
 class AdaGrad(BaseOptimizer):
     '''
         自适应学习率的梯度下降，在参数更新不均匀的情况下，可以比较好地自适应调整学习率，一般啥参数不用调
@@ -38,7 +56,7 @@ class AdaGrad(BaseOptimizer):
         initial_accumulator_value: float = ...,
         eps: float = ...
     '''
-    def __init__(self,parameters,lr=0.01,eps=1e-8,lr_decay=0.0,weight_decay=0.0,initial_accumulator_value=0.0):
+    def __init__(self,parameters,lr=1e-3,eps=1e-8,lr_decay=0.0,weight_decay=0.0,initial_accumulator_value=0.0):
         super().__init__(parameters,lr)
         self.eps = eps
         self.G = [np.full(param.data.shape,initial_accumulator_value) for param in parameters]
@@ -89,7 +107,7 @@ if __name__=='__main__':
     x=np.array(range(10)).reshape(-1,1)
     y_true=3*x+2+np.random.randn(10,1)*0.001
     layer=my_nn.MyLinearLayer(1,1,initial_policy='zeros')
-    optimizer=Adam([layer.weight,layer.bias])
+    optimizer=SGD([layer.weight,layer.bias],momentum=0.9,nesterov=True)
     loss_func=MSELoss()
     for i in range(1000000):
         y_pred=layer.forward(MyTensor.MyTensor(x))
@@ -102,3 +120,12 @@ if __name__=='__main__':
             break
     print(layer.weight.data,layer.bias.data)
     
+    '''
+    统一初始学习率下
+        目前战绩：
+            BGD:9886
+            Adam:18253
+            动量系数为0.9的SGD:9915
+            动量系数为0.9且Nesterov的SGD:942
+            
+    '''
