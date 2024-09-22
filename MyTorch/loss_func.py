@@ -80,18 +80,20 @@ class CrossEntropyLoss(LossFunc):
         # 因对于func.CrossEntropyLoss中的计算方法还有疑问因此暂时将这个修改后的实现直接放在这里
         # 计算 log(softmax)
         max_logit = np.max(y_pred.data, axis=1, keepdims=True)
-        log_softmax = y_pred.data - max_logit - np.log(np.sum(np.exp(y_pred.data - max_logit), axis=1, keepdims=True))
+        y_pred_sub_max = y_pred.data - max_logit
+        log_sum_exp = np.log(np.sum(np.exp(y_pred_sub_max), axis=1, keepdims=True))
+        simplified_cross = log_sum_exp - y_pred_sub_max
         
         # 交叉熵损失 = -真实标签的one-hot编码 * log(softmax)
-        loss = -np.sum(y_true.data * log_softmax, axis=1)
+        cross_entropy = np.sum(y_true.data * simplified_cross, axis=1)
         
         if reduction == 'mean':
-            loss = np.mean(loss)
+            cross_entropy = np.mean(cross_entropy)
         elif reduction == 'sum':
-            loss = np.sum(loss)
+            cross_entropy = np.sum(cross_entropy)
         
         # 创建 MyTensor 结果
-        result = MyTensor(loss, requires_grad=True)
+        result = MyTensor(cross_entropy, requires_grad=True)
 
 
         ComputationalGraph.add_node(self)
