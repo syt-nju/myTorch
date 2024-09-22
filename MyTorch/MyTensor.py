@@ -346,6 +346,29 @@ class Sum(Op):
             返回对应的导数值，为np.ndarray
         '''
         return grad*np.ones_like(node.data)
+class Sub(Op):
+    def forward(self, *args) -> MyTensor:
+        #检查：只能有两个参数;shape是否相同;device是否相同
+        myAssert(args.__len__()==2, "Sub must have exact 2 arguments")
+        myAssert(args[0].shape == args[1].shape, f"{args[0]}shape must be the same as {args[1]}", args[0], args[1])
+        myAssert(all(arg.device == self.device for arg in args), "device must be the same",self.device)
+        
+        #算出结果
+        result=args[0].data-args[1].data
+        
+        z = MyTensor(result, requires_grad= not all(not arg.requires_grad for arg in args), device=self.device) #暂定为，当且仅当所有输入的requires_grad=false，输出为requires_grad=false
+        ComputationalGraph.add_node(self)
+        z.father_Op = self
+        self.last.extend(list(args))
+        self.output=z
+        return z
+    def grad_func(self, node:MyTensor,grad: np.ndarray) ->np.ndarray: 
+        if node==self.last[0]:
+            return grad
+        elif node==self.last[1]:
+            return -grad
+        else:
+            raise ValueError("something wrong,check self.last")
 class Mul(Op):
     def forward(self, *args) -> MyTensor:
         '''
@@ -434,8 +457,9 @@ if __name__ == "__main__":
     a = MyTensor(np.random.randn(1, 3), requires_grad=True)
     b = MyTensor(np.random.randn(1, 3), requires_grad=True)
     c = MyTensor(np.random.randn(1, 3), requires_grad=True)
-    x = MyTensor(np.random.randn(1, 3), requires_grad=True)
-    ops = ['mul', 'sum', 'sum']
+    d = MyTensor(np.random.randn(1, 3), requires_grad=True)
+    e = MyTensor(np.random.randn(1, 3), requires_grad=True)
+    ops = ['mul', 'sum', 'sum','sub']
     def torch_result(*inputs, ops):
         input_torch = [torch.tensor(i, dtype=torch.float32, requires_grad=True) for i in inputs]
         result_torch = input_torch[0]
@@ -445,6 +469,8 @@ if __name__ == "__main__":
                 result_torch = result_torch * input_torch[i + 1]
             elif op == 'sum':
                 result_torch = result_torch + input_torch[i + 1]
+            elif op == 'sub':
+                result_torch = result_torch - input_torch[i + 1]
             else:
                 raise ValueError(f"Unsupported operation: {op}")
         result_torch.sum().backward()
@@ -457,6 +483,8 @@ if __name__ == "__main__":
                 result = Mul().forward(result, my_tensors[i + 1])
             elif op == 'sum':
                 result = Sum().forward(result, my_tensors[i + 1])
+            elif op == 'sub':
+                result = Sub().forward(result, my_tensors[i + 1])
             else:
                 raise ValueError(f"Unsupported operation: {op}")
 
@@ -468,7 +496,7 @@ if __name__ == "__main__":
         for i, my_tensor in enumerate(my_tensors):
             assert np.allclose(my_tensor.grad, torch_grads[i], atol=1e-5), f"Gradients do not match for input {i}! Custom = {my_tensor.grad}, Torch = {torch_grads[i]}"
 
-    test(ops, a, b, c, x)
+    test(ops, a, b, c, d,e)
     print("所有结果和梯度匹配！")
 
 
