@@ -283,7 +283,7 @@ class Op:
         '''
         NotImplementedError
 
-    def grad_func(self, grad: np.ndarray) -> Tuple[np.ndarray]:
+    def grad_func(self, grad: np.ndarray) -> np.ndarray:
         '''
         梯度传播
         '''
@@ -449,7 +449,35 @@ class MatMul(Op):
             return self.last[0].data.swapaxes(-1,-2)@grad
         else:
             raise ValueError("something wrong,check self.last")
-
+class Max(Op):
+    def __init__(self, device: str = "cpu", requires_grad: bool = False,axis=None,keepdims=False) -> None:
+        super().__init__(device, requires_grad)
+        self.axis=axis
+        self.keepdims=keepdims
+    def forward(self, *args) -> MyTensor:
+        '''
+        前向传播
+        '''
+        #检查：检查参数是否唯一
+        myAssert(args.__len__()==1, "Max must have 1 arguments")
+        
+        #算出结果
+        result=np.max(args[0].data,axis=self.axis,keepdims=self.keepdims)
+        
+        z = MyTensor(result,requires_grad= not all(not arg.requires_grad for arg in args), device=self.device)
+        ComputationalGraph.add_node(self)
+        z.father_Op = self
+        self.last.extend(list(args))
+        self.output=z
+        return z
+    def grad_func(self, node,grad: np.ndarray) -> np.ndarray:
+        '''参数node会被忽略，因为max是一个单输入的op'''
+        #由于所有的比较都要求比较的位置对应，为增强鲁棒性，直接把output的data扩展到和input一样的dim
+        if self.keepdims:
+            y_full_dim=self.output.data
+        else:
+            y_full_dim=np.expand_dims(self.output.data,axis=self.axis)
+        return (np.isclose(self.last[0].data,y_full_dim,atol=1e-8)).astype(float)*grad
 
 if __name__ == "__main__":
 
@@ -516,3 +544,15 @@ if __name__ == "__main__":
         assert np.allclose(B.grad, result_torch[1], atol = 1e-5), f"MatMul gradients do not match! Custom = {B.grad}, Torch = {result_torch[1]}"
     
     print("MatMul 梯度匹配！")
+    
+    #测试max
+    a = np.array([[ 1.27920267, -1.49798259, -0.95754972],
+              [-3.24696494,  1.27485179,  0.34984062],
+              [-0.21765164 ,-0.13258395 ,-0.16691512]])
+    print(a)
+    a=MyTensor(a,requires_grad=True)
+    max=Max(axis=1,keepdims=False)
+    result=max.forward(a)
+    print(result)
+    result.backward()
+    print(a.grad)

@@ -1,5 +1,7 @@
+from typing import Tuple
 from utils.utils import *
-from MyTensor import MyTensor,MatMul,Sum
+from MyTensor import MyTensor,MatMul,Sum,Op,Mul
+from MyTensor import ComputationalGraph
 import numpy as np
 class MyLinearLayer():
     def __init__(self,fan_in:int,fan_out:int,initial_policy:str = 'random') -> None:
@@ -32,6 +34,18 @@ class MLP():
         layer1 = 'Layer1:\n' + 'weight:\n' + str(self.layer1.weight) + '\nbias:\n' + str(self.layer1.bias) + '\n'
         layer2 = 'Layer2:\n' + 'weight:\n' + str(self.layer2.weight) + '\nbias:\n' + str(self.layer2.bias) + '\n'
         return 'MLP:'+'\n'+layer1+layer2
+class Softmax():#采用小算子的forward来实现计算图的构建
+    def __init__(self,dim=0) -> None:
+        '''@dim:指定沿哪个维度应用softmax'''
+        self.dim = dim
+    def forward(self,x:MyTensor)->MyTensor:
+        '''    x_sub_max = x.data - np.max(x.data, axis = dim, keepdims = True)
+    exp = np.exp(x_sub_max)
+    exp_sum = np.sum(exp, axis = dim, keepdims = True)
+    x.data = exp/exp_sum'''
+        x_sub_max=
+        
+    
 if __name__ == "__main__":
     # #测试MyLinearLayer
     # layer = MyLinearLayer(1,3,initial_policy='zeros')
