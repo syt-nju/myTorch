@@ -36,6 +36,9 @@ class MyLinearLayer():
         return add.output
 class MLP():
     def __init__(self,input_size:int,hidden_size:int,output_size:int,initial_policy:str = 'random') -> None:
+        '''
+           initial_policy:初始化策略，可以是'random','zeros,'xavier','He'
+        '''        
         self.layer1 = MyLinearLayer(input_size,hidden_size,initial_policy)
         self.layer2 = MyLinearLayer(hidden_size,output_size,initial_policy)
         self.parameters = [self.layer1.weight,self.layer1.bias,self.layer2.weight,self.layer2.bias]
