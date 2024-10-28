@@ -403,6 +403,32 @@ class Mul(Op):
             return grad*self.last[0].data
         else:
             raise ValueError("something wrong,check self.last")
+class Div(Op):
+    def forward(self, *args) -> MyTensor:
+        '''
+        前向传播
+        '''
+        #检查：只能有两个参数;shape是否相同;device是否相同
+        myAssert(args.__len__()==2, "Div must have exact 2 arguments")
+        myAssert(args[0].shape == args[1].shape, f"{args[0]}shape must be the same as {args[1]}", args[0], args[1])
+        myAssert(all(arg.device == self.device for arg in args), "device must be the same",self.device)
+        
+        #算出结果
+        result=args[0].data/args[1].data
+        
+        z = MyTensor(result, requires_grad= not all(not arg.requires_grad for arg in args), device=self.device) #暂定为，当且仅当所有输入的requires_grad=false，输出为requires_grad=false
+        ComputationalGraph.add_node(self)
+        z.father_Op = self
+        self.last.extend(list(args))
+        self.output=z
+        return z
+    def grad_func(self, node:MyTensor,grad: np.ndarray) ->np.ndarray: 
+        if node==self.last[0]:
+            return grad/self.last[1].data
+        elif node==self.last[1]:
+            return -grad*self.last[0].data/(self.last[1].data**2)
+        else:
+            raise ValueError("something wrong,check self.last")
 class MatMul(Op):
     def forward(self, *args) -> MyTensor:
         '''
