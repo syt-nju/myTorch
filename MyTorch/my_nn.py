@@ -1,6 +1,6 @@
 from typing import Tuple
 from utils.utils import *
-from MyTensor import MyTensor,MatMul,Sum,Op,Mul
+from MyTensor import MyTensor,MatMul,Sum,Op,Mul,Max,Exp,Log,Sub,SumUnary,Div
 from MyTensor import ComputationalGraph
 import numpy as np
 class MyLinearLayer():
@@ -39,11 +39,23 @@ class Softmax():#采用小算子的forward来实现计算图的构建
         '''@dim:指定沿哪个维度应用softmax'''
         self.dim = dim
     def forward(self,x:MyTensor)->MyTensor:
-        '''    x_sub_max = x.data - np.max(x.data, axis = dim, keepdims = True)
-    exp = np.exp(x_sub_max)
-    exp_sum = np.sum(exp, axis = dim, keepdims = True)
-    x.data = exp/exp_sum'''
-        # x_sub_max=   这里指数算子还没写完，先等着
+        '''     x_sub_max = x.data - np.max(x.data, axis = dim, keepdims = True)
+                exp = np.exp(x_sub_max)
+                exp_sum = np.sum(exp, axis = dim, keepdims = True)
+                x.data = exp/exp_sum'''
+        sub_1=Sub()
+        max=Max(axis=self.dim,keepdims=True)
+        exp_1=Exp()
+        sumunary=SumUnary(axis=self.dim,keepdims=True)
+        div=Div()
+        
+        
+        x_sub_max = sub_1.forward(x,max.forward(x))
+        exp=exp_1.forward(x_sub_max)
+        exp_sum=sumunary.forward(exp)
+        result=div.forward(exp,exp_sum)
+        return result
+        
         
     
 if __name__ == "__main__":

@@ -298,7 +298,7 @@ class Op:
                 add_grad=self.grad_func(node,self.output.grad)
                 if node.grad.shape!=add_grad.shape:
                     #找到被广播的维度
-                    broadcast_axis=[-i for i in range(1,add_grad.ndim+1) if add_grad.shape[-i]==1]     
+                    broadcast_axis=[-i for i in range(1,node.grad.ndim+1) if node.grad.shape[-i]==1]     
                     add_grad=np.sum(add_grad,axis=tuple(broadcast_axis),keepdims=True)#求均值压缩
                     if node.grad.ndim<add_grad.ndim:
                         add_grad=np.sum(add_grad,axis=tuple(range(add_grad.ndim-node.grad.ndim)))#把延长的维度进行压缩，这里无所谓sum还是mean，理想状态下应该前几个维度大小都为1
@@ -350,7 +350,7 @@ class Sub(Op):
     def forward(self, *args) -> MyTensor:
         #检查：只能有两个参数;shape是否相同;device是否相同
         myAssert(args.__len__()==2, "Sub must have exact 2 arguments")
-        myAssert(args[0].shape == args[1].shape, f"{args[0]}shape must be the same as {args[1]}", args[0], args[1])
+        # myAssert(args[0].shape == args[1].shape, f"{args[0]}shape must be the same as {args[1]}", args[0], args[1])
         myAssert(all(arg.device == self.device for arg in args), "device must be the same",self.device)
         
         #算出结果
@@ -410,7 +410,7 @@ class Div(Op):
         '''
         #检查：只能有两个参数;shape是否相同;device是否相同
         myAssert(args.__len__()==2, "Div must have exact 2 arguments")
-        myAssert(args[0].shape == args[1].shape, f"{args[0]}shape must be the same as {args[1]}", args[0], args[1])
+        myAssert(((args[0].shape == args[1].shape)or (len(args[0].data.shape)==len(args[1].data.shape))), f"{args[0]}shape/dim must be the same as {args[1]}", args[0], args[1])
         myAssert(all(arg.device == self.device for arg in args), "device must be the same",self.device)
         
         #算出结果
