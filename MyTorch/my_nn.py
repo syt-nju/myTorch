@@ -43,7 +43,7 @@ class Softmax():#采用小算子的forward来实现计算图的构建
     exp = np.exp(x_sub_max)
     exp_sum = np.sum(exp, axis = dim, keepdims = True)
     x.data = exp/exp_sum'''
-        x_sub_max=
+        # x_sub_max=   这里指数算子还没写完，先等着
         
     
 if __name__ == "__main__":

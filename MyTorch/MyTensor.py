@@ -478,9 +478,48 @@ class Max(Op):
         else:
             y_full_dim=np.expand_dims(self.output.data,axis=self.axis)
         return (np.isclose(self.last[0].data,y_full_dim,atol=1e-8)).astype(float)*grad
-
+class exp(Op):
+    def forward(self, *args) -> MyTensor:
+        '''
+        前向传播
+        '''
+        #检查：检查参数是否唯一
+        myAssert(args.__len__()==1, "exp must have 1 arguments")
+        
+        #算出结果
+        result=np.exp(args[0].data)
+        
+        z = MyTensor(result,requires_grad= not all(not arg.requires_grad for arg in args), device=self.device)
+        ComputationalGraph.add_node(self)
+        z.father_Op = self
+        self.last.extend(list(args))
+        self.output=z
+        return z
+    def grad_func(self, node,grad: np.ndarray) -> np.ndarray:
+        '''参数node会被忽略，因为exp是一个单输入的op'''
+        return np.exp(self.last[0].data)*grad
+class log(Op):
+    def forward(self, *args) -> MyTensor:
+        '''
+        前向传播
+        '''
+        #检查：检查参数是否唯一
+        myAssert(args.__len__()==1, "log must have 1 arguments")
+        
+        #算出结果
+        result=np.log(args[0].data)
+        
+        z = MyTensor(result,requires_grad= not all(not arg.requires_grad for arg in args), device=self.device)
+        ComputationalGraph.add_node(self)
+        z.father_Op = self
+        self.last.extend(list(args))
+        self.output=z
+        return z
+    def grad_func(self, node,grad: np.ndarray) -> np.ndarray:
+        '''参数node会被忽略，因为log是一个单输入的op'''
+        return grad/self.last[0].data
 if __name__ == "__main__":
-
+    #利用torch,对+，-，*，@进行测试
     import torch
     a = MyTensor(np.random.randn(1, 3), requires_grad=True)
     b = MyTensor(np.random.randn(1, 3), requires_grad=True)
