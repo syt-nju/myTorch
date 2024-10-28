@@ -4,6 +4,7 @@ import numpy as np
 from autograd import no_grad, is_grad_enabled 
 from utils.utils import myAssert
 import random
+import warnings
 
 READSIGN=114514#作为标记，无实际意义
 #构建基础版Tensor类
@@ -445,7 +446,15 @@ class MatMul(Op):
         #记录下是否出现矩阵一维导致的broadcast
         self.is_a_broadcast,self.is_b_broadcast=args[0].ndim<2,args[1].ndim<2
         
-        result=np.matmul(args[0].data,args[1].data)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")  # 捕捉所有警告,主要目的为捕捉溢出
+            result=np.matmul(args[0].data,args[1].data)
+            if w:
+                for warning in w:
+                    print(f"Warning: {warning.message}")
+                    print("arg[0]:",args[0].data)
+                    print("arg[1]:",args[1].data)
+
         z = MyTensor(result,requires_grad= not all(not arg.requires_grad for arg in args), device=self.device)
         ComputationalGraph.add_node(self)
         z.father_Op = self

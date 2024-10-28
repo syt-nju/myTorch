@@ -16,10 +16,14 @@ import os
 data_dir = "dataset"
 if not os.path.exists(data_dir):
     os.makedirs(data_dir)
+data_transforms = transforms.Compose([
+    transforms.ToTensor(),  # 将图像转换为张量
+    transforms.Normalize((0.5,), (0.5,)),  # 归一化，均值为0.5，标准差为0.5
+])
 
 # MNIST dataset
-train_data = datasets.MNIST(data_dir, train=True, download=True, transform=transforms.ToTensor())
-test_data = datasets.MNIST(data_dir, train=False, download=True, transform=transforms.ToTensor())
+train_data = datasets.MNIST(data_dir, train=True, download=True, transform=data_transforms)
+test_data = datasets.MNIST(data_dir, train=False, download=True, transform=data_transforms)
 train_loader = torch.utils.data.DataLoader(train_data, batch_size=64, shuffle=True)
 test_loader = torch.utils.data.DataLoader(test_data, batch_size=64, shuffle=False)
 
@@ -55,7 +59,7 @@ class Net(torch.nn.Module):
 criterion = nn.CrossEntropyLoss()
 model_torch = Net()
 optimizer = optim.SGD(model_torch.parameters(), lr=0.01)
-myModel = MLP(784, 100, 10, initial_policy='random')
+myModel = MLP(784, 100, 10, initial_policy='zeros')
 myOptimizer = BGD(myModel.parameters, lr=0.01)
 
 

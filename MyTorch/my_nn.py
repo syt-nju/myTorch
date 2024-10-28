@@ -5,12 +5,23 @@ from MyTensor import ComputationalGraph
 import numpy as np
 class MyLinearLayer():
     def __init__(self,fan_in:int,fan_out:int,initial_policy:str = 'random') -> None:
+        '''
+           @fan_in:输入维度
+           @fan_out:输出维度
+           @initial_policy:初始化策略，可以是'random','zeros,'xavier','He'
+        '''
         if initial_policy == 'random':#正态分布初始化
-            self.weight = MyTensor(np.random.randn(fan_in,fan_out),requires_grad=True)
-            self.bias = MyTensor(np.random.randn(fan_out),requires_grad=True)
+            self.weight = MyTensor(np.random.randn(fan_in,fan_out)*np.sqrt(1/fan_in),requires_grad=True)
+            self.bias = MyTensor(np.random.randn(fan_out)*np.sqrt(1/fan_in),requires_grad=True)
         if initial_policy == 'zeros':
             self.weight = MyTensor(np.zeros((fan_in,fan_out)),requires_grad=True)
             self.bias = MyTensor(np.zeros(fan_out),requires_grad=True)
+        if initial_policy=='xavier':
+            self.weight = MyTensor(np.random.randn(fan_in,fan_out)*np.sqrt(2/fan_in+fan_out),requires_grad=True)
+            self.bias = MyTensor(np.random.randn(fan_out)*np.sqrt(2/fan_in+fan_out),requires_grad=True)
+        if initial_policy=='He':
+            self.weight = MyTensor(np.random.randn(fan_in,fan_out)*np.sqrt(2/fan_in),requires_grad=True)
+            self.bias = MyTensor(np.random.randn(fan_out)*np.sqrt(2/fan_in),requires_grad=True)
         self.parameters = [self.weight,self.bias]
     def forward(self,x:MyTensor)->MyTensor:
         #检查形状

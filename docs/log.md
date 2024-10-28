@@ -71,7 +71,9 @@ Traceback (most recent call last):
 numpy.AxisError: axis2: axis -2 is out of bounds for array of dimension 1
 ```
 
-## 2024.9.8
+## 2024.9.8 
+
+### Bug
 
 尝试用 MLP 跑了一下 MNIST 数据集的训练
 
@@ -87,3 +89,9 @@ numpy.AxisError: axis2: axis -2 is out of bounds for array of dimension 1
 感觉是 float 精度的问题。
 
 并且现在的 MLP 层数好像是固定的，后续可以考虑用基类的方法自定义 MLP。
+
+### BugFix
+
+初始化问题，原来的初始化策略是(0,1)正态分布没有考虑fan_in 
+
+后续修改并添加几个初始化策略后没什么问题了
