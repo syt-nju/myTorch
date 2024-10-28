@@ -478,7 +478,7 @@ class Max(Op):
         else:
             y_full_dim=np.expand_dims(self.output.data,axis=self.axis)
         return (np.isclose(self.last[0].data,y_full_dim,atol=1e-8)).astype(float)*grad
-class exp(Op):
+class Exp(Op):
     def forward(self, *args) -> MyTensor:
         '''
         前向传播
@@ -498,7 +498,7 @@ class exp(Op):
     def grad_func(self, node,grad: np.ndarray) -> np.ndarray:
         '''参数node会被忽略，因为exp是一个单输入的op'''
         return np.exp(self.last[0].data)*grad
-class log(Op):
+class Log(Op):
     def forward(self, *args) -> MyTensor:
         '''
         前向传播
