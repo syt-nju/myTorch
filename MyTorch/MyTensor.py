@@ -450,6 +450,10 @@ class MatMul(Op):
         else:
             raise ValueError("something wrong,check self.last")
 class Max(Op):
+    '''
+        max算子
+        实例化时可以指定axis和keepdims
+    '''
     def __init__(self, device: str = "cpu", requires_grad: bool = False,axis=None,keepdims=False) -> None:
         super().__init__(device, requires_grad)
         self.axis=axis
@@ -518,6 +522,32 @@ class Log(Op):
     def grad_func(self, node,grad: np.ndarray) -> np.ndarray:
         '''参数node会被忽略，因为log是一个单输入的op'''
         return grad/self.last[0].data
+class SumUnary(Op):
+    def __init__(self, device = "cpu", requires_grad = False,axis=None,keepdims=False) -> None:
+        super().__init__(device, requires_grad)
+        self.axis=axis
+        self.keepdims=keepdims
+    def forward(self, *args) -> MyTensor:
+        '''
+        前向传播
+        '''
+        #检查：检查参数是否唯一
+        myAssert(args.__len__()==1, "sum must have 1 arguments")
+        
+        #算出结果
+        result=np.sum(args[0].data,axis=self.axis,keepdims=self.keepdims)
+        
+        z = MyTensor(result,requires_grad= not all(not arg.requires_grad for arg in args), device=self.device)
+        ComputationalGraph.add_node(self)
+        z.father_Op = self
+        self.last.extend(list(args))
+        self.output=z
+        return z
+    def grad_func(self, node,grad: np.ndarray) -> np.ndarray:
+        '''参数node会被忽略，因为sum是一个单输入的op'''
+        if not (self.axis is None or self.keepdims):
+            grad=np.expand_dims(grad,axis=self.axis)
+        return np.ones_like(self.last[0].data)*grad
 if __name__ == "__main__":
     #利用torch,对+，-，*，@进行测试
     import torch
