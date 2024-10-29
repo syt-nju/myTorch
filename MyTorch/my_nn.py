@@ -3,6 +3,25 @@ from utils.utils import *
 from MyTensor import MyTensor,MatMul,Sum,Op,Mul,Max,Exp,Log,Sub,SumUnary,Div
 from MyTensor import ComputationalGraph
 import numpy as np
+class Sequential():
+    def __init__(self,*args) -> None:
+        self.layers = list(args)
+
+    def forward(self,x:MyTensor)->MyTensor:
+        for layer in self.layers:
+            x = layer.forward(x)
+        return x
+    def __repr__(self) -> str:
+        
+        res = 'Model structure:\n   Sequential(\n'
+        for layer in self.layers:
+            res += '        '+str(layer) + '\n'
+        res += ')'
+        return res
+    def __len__(self):
+        return len(self.layers)
+    def __getitem__(self,index):
+        return self.layers[index]
 class MyLinearLayer():
     def __init__(self,fan_in:int,fan_out:int,initial_policy:str = 'random') -> None:
         '''
@@ -23,6 +42,10 @@ class MyLinearLayer():
             self.weight = MyTensor(np.random.randn(fan_in,fan_out)*np.sqrt(2/fan_in),requires_grad=True)
             self.bias = MyTensor(np.random.randn(fan_out)*np.sqrt(2/fan_in),requires_grad=True)
         self.parameters = [self.weight,self.bias]
+    def __str__(self) -> str:
+        return 'MyLinearLayer('+str(self.weight.shape[0])+','+str(self.weight.shape[1])+')'
+    def __repr__(self):
+        return f'weight:\n{self.weight}\nbias:\n{self.bias}'
     def forward(self,x:MyTensor)->MyTensor:
         #检查形状
         if x.data.ndim == 1:
@@ -38,7 +61,10 @@ class MLP():
     def __init__(self,input_size:int,hidden_size:int,output_size:int,initial_policy:str = 'random') -> None:
         '''
            initial_policy:初始化策略，可以是'random','zeros,'xavier','He'
-        '''        
+        '''
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.output_size = output_size        
         self.layer1 = MyLinearLayer(input_size,hidden_size,initial_policy)
         self.layer2 = MyLinearLayer(hidden_size,output_size,initial_policy)
         self.parameters = [self.layer1.weight,self.layer1.bias,self.layer2.weight,self.layer2.bias]
@@ -48,6 +74,8 @@ class MLP():
         layer1 = 'Layer1:\n' + 'weight:\n' + str(self.layer1.weight) + '\nbias:\n' + str(self.layer1.bias) + '\n'
         layer2 = 'Layer2:\n' + 'weight:\n' + str(self.layer2.weight) + '\nbias:\n' + str(self.layer2.bias) + '\n'
         return 'MLP:'+'\n'+layer1+layer2
+    def __str__(self):
+        return f"MLP({self.input_size},{self.hidden_size},{self.output_size})"
 class Softmax():#采用小算子的forward来实现计算图的构建
     def __init__(self,dim=0) -> None:
         '''@dim:指定沿哪个维度应用softmax'''
@@ -69,7 +97,7 @@ class Softmax():#采用小算子的forward来实现计算图的构建
         exp_sum=sumunary.forward(exp)
         result=div.forward(exp,exp_sum)
         return result
-class ReLu(Op):
+class ReLU(Op):
     def forward(self,*args)->MyTensor:
         '''    x.data = np.maximum(x.data, 0)'''
         myAssert(args.__len__()==1, "Relu must have 1 arguments")
@@ -83,7 +111,8 @@ class ReLu(Op):
         return z
     def grad_func(self, node,grad: np.ndarray) -> np.ndarray:
         return grad * (node.data > 0)
-        
+    def __repr__(self) -> str:
+        return 'ReLU()'
         
     
 if __name__ == "__main__":
