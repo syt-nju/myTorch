@@ -69,6 +69,20 @@ class Softmax():#采用小算子的forward来实现计算图的构建
         exp_sum=sumunary.forward(exp)
         result=div.forward(exp,exp_sum)
         return result
+class ReLu(Op):
+    def forward(self,*args)->MyTensor:
+        '''    x.data = np.maximum(x.data, 0)'''
+        myAssert(args.__len__()==1, "Relu must have 1 arguments")
+        
+        result = np.maximum(args[0].data, 0)
+        z = MyTensor(result,requires_grad= not all(not arg.requires_grad for arg in args), device=self.device)
+        ComputationalGraph.add_node(self)
+        z.father_Op = self
+        self.last.extend(list(args))
+        self.output=z
+        return z
+    def grad_func(self, node,grad: np.ndarray) -> np.ndarray:
+        return grad * (node.data > 0)
         
         
     
