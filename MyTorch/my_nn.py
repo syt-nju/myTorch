@@ -6,7 +6,10 @@ import numpy as np
 class Sequential():
     def __init__(self,*args) -> None:
         self.layers = list(args)
-
+        self.parameters = []
+        for layer in self.layers:
+            if hasattr(layer,'parameters'):
+                self.parameters.extend(layer.parameters)
     def forward(self,x:MyTensor)->MyTensor:
         for layer in self.layers:
             x = layer.forward(x)
