@@ -20,6 +20,16 @@ class LossFunc(Op):
         node =self.last[0]#y_pred
         #由于loss函数只有一个输入，没有上级传入梯度等参数，不会出现广播
         node.grad+=self.grad_func()
+    def forward(self,y_pred:MyTensor,y_true:MyTensor)->MyTensor:
+        '''
+        实现损失函数的前向传播
+        @param y_pred:模型的输出
+        @param y_true:真实标签
+        @return:结果的MyTensor形式
+        '''
+        NotImplementedError
+    def __call__(self, *args, **kwds):
+        return self.forward(*args, **kwds)
        
 class MSELoss(LossFunc):
     def forward(self,y_pred:MyTensor, y_true:MyTensor, reduction = 'mean')->MyTensor:
