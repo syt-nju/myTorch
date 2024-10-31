@@ -1,2 +1,2 @@
-from .MyTensor import *
+from .myTensor import *
 from .utils.utils import *

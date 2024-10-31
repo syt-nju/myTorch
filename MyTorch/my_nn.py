@@ -1,7 +1,7 @@
 from typing import Tuple
 from MyTorch.utils.utils import *
-from MyTorch.MyTensor import MyTensor,MatMul,Sum,Op,Mul,Max,Exp,Log,Sub,SumUnary,Div
-from MyTorch.MyTensor import ComputationalGraph
+from MyTorch.myTensor import MyTensor,MatMul,Sum,Op,Mul,Max,Exp,Log,Sub,SumUnary,Div
+from MyTorch.myTensor import ComputationalGraph
 import numpy as np
 class Sequential():
     def __init__(self,*args) -> None:

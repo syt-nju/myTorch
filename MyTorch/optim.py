@@ -1,4 +1,4 @@
-from MyTorch.MyTensor import MyTensor
+from MyTorch.myTensor import MyTensor
 import numpy as np
 from MyTorch import my_nn
 from MyTorch.loss_func import MSELoss

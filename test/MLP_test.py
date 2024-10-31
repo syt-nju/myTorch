@@ -69,12 +69,12 @@ def train_mytensor(epoch):
     running_correct = 0
     for batch_idx, data in enumerate(train_loader):
         inputs, target = data
-        inputs = MyTensor.MyTensor(inputs.numpy().reshape(inputs.shape[0], -1))
+        inputs = MyTensor(inputs.numpy().reshape(inputs.shape[0], -1))
 
         # 实际上应该用交叉熵损失函数，由于还没实现，这里用 MSE 代替，所以这里的处理有点唐，问GPT的
         target_one_hot = np.zeros((target.size(0), 10))  
         target_one_hot[np.arange(target.size(0)), target.numpy()] = 1  # 将目标转换为 one-hot 编码
-        target = MyTensor.MyTensor(target_one_hot)  # 转换为自定义张量 MyTensor 格式
+        target = MyTensor(target_one_hot)  # 转换为自定义张量 MyTensor 格式
 
         myOptimizer.zero_grad()
         outputs = myModel.forward(inputs)
@@ -126,8 +126,8 @@ if __name__ == "__main__":
     train_mytensor(1)
 
     # 很简单的测试，分别用 MyTensor 和 pytorch 跑了一个训练过程
-    X_train = MyTensor.MyTensor(np.array([[0,0],[0,1],[1,0],[1,1]]), requires_grad=True)
-    y_train = MyTensor.MyTensor(np.array([[0],[1],[1],[0]]), requires_grad=True)
+    X_train = MyTensor(np.array([[0,0],[0,1],[1,0],[1,1]]), requires_grad=True)
+    y_train = MyTensor(np.array([[0],[1],[1],[0]]), requires_grad=True)
 
     X_torch = torch.tensor([[0,0],[0,1],[1,0],[1,1]],dtype=torch.float32)
     y_torch = torch.tensor([[0],[1],[1],[0]],dtype=torch.float32)
@@ -148,8 +148,8 @@ if __name__ == "__main__":
     optimizer = BGD(model.parameters,lr=0.01)
     for epoch in range(10000):
         for i, (X_batch, y_batch) in enumerate(DataLoader):
-            y_pred = model.forward(MyTensor.MyTensor(X_batch))
-            loss = MSELoss().forward(y_pred, MyTensor.MyTensor(y_batch))
+            y_pred = model.forward(MyTensor(X_batch))
+            loss = MSELoss().forward(y_pred, MyTensor(y_batch))
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
