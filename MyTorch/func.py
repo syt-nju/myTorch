@@ -1,7 +1,7 @@
 '''实现所需要的算子'''
 
 import numpy as np
-import MyTensor
+from MyTorch import MyTensor
 
 
 def sigmoid(x:MyTensor)->MyTensor:

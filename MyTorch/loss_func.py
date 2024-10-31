@@ -8,8 +8,8 @@ Add CrossEntropyLoss
 
 #实现损失函数，forward基于已经实现的func.py的函数
 from typing import Tuple
-from MyTensor import MyTensor,Op,ComputationalGraph
-import func
+from MyTorch.MyTensor import MyTensor,Op,ComputationalGraph
+from MyTorch import func
 import numpy as np
 class LossFunc(Op):
     #重载op_backward

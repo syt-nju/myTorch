@@ -1,7 +1,7 @@
-import MyTensor
+from MyTorch.MyTensor import MyTensor
 import numpy as np
-import my_nn
-from loss_func import MSELoss
+from MyTorch import my_nn
+from MyTorch.loss_func import MSELoss
 class BaseOptimizer():
     def __init__(self, parameters, lr=0.01):
         '''

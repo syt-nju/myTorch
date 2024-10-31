@@ -1,8 +1,8 @@
 #基于numpy 构建基本的Tensor类
 from typing import Union, Tuple,Optional
 import numpy as np
-from autograd import no_grad, is_grad_enabled 
-from utils.utils import myAssert
+from MyTorch.autograd import no_grad, is_grad_enabled 
+from MyTorch.utils import *
 import random
 import warnings
 

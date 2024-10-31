@@ -1,9 +1,9 @@
 import __init__
-import MyTensor
-from my_nn import MLP
-from optim import BGD
-from loss_func import MSELoss
-from Dataloader import mydataLoader
+from MyTorch import MyTensor
+from MyTorch.my_nn import MLP
+from MyTorch.optim import BGD
+from MyTorch.loss_func import MSELoss
+from MyTorch.Dataloader import mydataLoader
 import numpy as np
 import torch
 from torch import nn, optim

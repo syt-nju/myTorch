@@ -3,7 +3,7 @@
     要求使用MyTensor的形式存储数据
 '''
 import numpy as np
-import MyTensor
+from MyTorch.MyTensor import MyTensor
 
 
 class Dataset:
