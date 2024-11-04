@@ -123,36 +123,36 @@ def train_torch(epoch):
 if __name__ == "__main__":
 
     train_torch(1)
-    train_mytensor(1)
+    # train_mytensor(1)
 
     # 很简单的测试，分别用 MyTensor 和 pytorch 跑了一个训练过程
     X_train = MyTensor(np.array([[0,0],[0,1],[1,0],[1,1]]), requires_grad=True)
     y_train = MyTensor(np.array([[0],[1],[1],[0]]), requires_grad=True)
 
-    X_torch = torch.tensor([[0,0],[0,1],[1,0],[1,1]],dtype=torch.float32)
-    y_torch = torch.tensor([[0],[1],[1],[0]],dtype=torch.float32)
-    model = torch.nn.Linear(2,1)
-    loss_fn = torch.nn.MSELoss()
-    optimizer = torch.optim.SGD(model.parameters(),lr=0.01)
-    for epoch in range(10000):
-        y_pred = model(X_torch)
-        loss = loss_fn(y_pred, y_torch)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        if epoch%1000 == 0:
-            print(f'epoch: {epoch}, loss: {loss.item()}')
+    # X_torch = torch.tensor([[0,0],[0,1],[1,0],[1,1]],dtype=torch.float32)
+    # y_torch = torch.tensor([[0],[1],[1],[0]],dtype=torch.float32)
+    # model = torch.nn.Linear(2,1)
+    # loss_fn = torch.nn.MSELoss()
+    # optimizer = torch.optim.SGD(model.parameters(),lr=0.01)
+    # for epoch in range(10000):
+    #     y_pred = model(X_torch)
+    #     loss = loss_fn(y_pred, y_torch)
+    #     optimizer.zero_grad()
+    #     loss.backward()
+    #     optimizer.step()
+    #     if epoch%1000 == 0:
+    #         print(f'epoch: {epoch}, loss: {loss.item()}')
 
-    DataLoader = mydataLoader(X_train, y_train, 2, shuffle=True, drop_last=False)
-    model = MLP(2,3,1,initial_policy='zeros')
-    optimizer = BGD(model.parameters,lr=0.01)
-    for epoch in range(10000):
-        for i, (X_batch, y_batch) in enumerate(DataLoader):
-            y_pred = model.forward(MyTensor(X_batch))
-            loss = MSELoss().forward(y_pred, MyTensor(y_batch))
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
-            if epoch%1000 == 0:
-                print(f'epoch: {epoch}, batch: {i}, loss: {loss.data}')
+    # DataLoader = mydataLoader(X_train, y_train, 2, shuffle=True, drop_last=False)
+    # model = MLP(2,3,1,initial_policy='zeros')
+    # optimizer = BGD(model.parameters,lr=0.01)
+    # for epoch in range(10000):
+    #     for i, (X_batch, y_batch) in enumerate(DataLoader):
+    #         y_pred = model.forward(MyTensor(X_batch))
+    #         loss = MSELoss().forward(y_pred, MyTensor(y_batch))
+    #         loss.backward()
+    #         optimizer.step()
+    #         optimizer.zero_grad()
+    #         if epoch%1000 == 0:
+    #             print(f'epoch: {epoch}, batch: {i}, loss: {loss.data}')
 
