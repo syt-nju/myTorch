@@ -25,6 +25,8 @@ class Sequential():
         return len(self.layers)
     def __getitem__(self,index):
         return self.layers[index]
+    def __call__(self,x:MyTensor)->MyTensor:
+        return self.forward(x)
 class MyLinearLayer():
     def __init__(self,fan_in:int,fan_out:int,initial_policy:str = 'random') -> None:
         '''
