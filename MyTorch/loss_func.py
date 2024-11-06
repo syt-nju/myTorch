@@ -12,6 +12,11 @@ from MyTorch.myTensor import MyTensor,Op,ComputationalGraph
 from MyTorch import func
 import numpy as np
 class LossFunc(Op):
+    '''
+        损失函数类的基类
+        继承自算子，但是要求不可调用forward(unsafe,如果这样要求每次调用都实例化来清理self.last)，
+        请调用call方法
+    '''
     #重载op_backward
     def op_backward(self):
         '''
@@ -29,6 +34,7 @@ class LossFunc(Op):
         '''
         NotImplementedError
     def __call__(self, *args, **kwds):
+        self.last = []#清空上次的记录,以后就不用反复实例化了
         return self.forward(*args, **kwds)
        
 class MSELoss(LossFunc):
