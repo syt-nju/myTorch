@@ -242,7 +242,7 @@ class MyTensor(metaclass=TensorMeta):
         '''
         梯度清零
         '''
-        NotImplementedError
+        self.grad = np.zeros_like(self.data)
     
     def max(self, axis = None, keepdims: bool = False):
         '''
