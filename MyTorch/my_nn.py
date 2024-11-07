@@ -102,6 +102,24 @@ class Softmax():#采用小算子的forward来实现计算图的构建
         exp_sum=sumunary.forward(exp)
         result=div.forward(exp,exp_sum)
         return result
+class LogSoftmax():
+    def __init__(self,dim=0) -> None:
+        self.dim = dim
+    def forward(self,x:MyTensor)->MyTensor:
+        '''        x_sub_max = x.data - np.max(x.data, axis = axis, keepdims = keepdims)
+    x.data =  x_sub_max - np.log(np.sum(np.exp(x_sub_max), axis = axis, keepdims = keepdims))'''
+        sub_1=Sub()
+        max=Max(axis=self.dim,keepdims=True)
+        exp_1=Exp()
+        sumunary=SumUnary(axis=self.dim,keepdims=True)
+        log=Log()
+        sub_2=Sub()
+        
+        x_sub_max = sub_1.forward(x,max.forward(x))
+        exp=exp_1.forward(x_sub_max)
+        exp_sum=sumunary.forward(exp)
+        result = sub_2.forward(x_sub_max,log.forward(exp_sum))
+        return result
 class ReLU(Op):
     def forward(self,*args)->MyTensor:
         '''    x.data = np.maximum(x.data, 0)'''
@@ -115,7 +133,7 @@ class ReLU(Op):
         self.output=z
         return z
     def grad_func(self, node,grad: np.ndarray) -> np.ndarray:
-        return grad * (node.data > 0)
+        return grad * (self.last[0].data > 0)
     def __repr__(self) -> str:
         return 'ReLU()'
         
