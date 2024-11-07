@@ -16,7 +16,7 @@ class Dataset:
     
     def __getitem__(self, idx):
         '''
-        retrieve the idx-th data
+        retrieve the idx-th data, expected to be a single sample
         '''
         NotImplementedError
     
@@ -101,17 +101,26 @@ class Iterater:
         self.dataloader = dataloader
         self.iterater = iter(self.dataloader.batch_sampler)
     
+    
     def __next__(self):
-        idx = next(self.iterater)
-        return self.dataloader.dataset[idx]
-
+        idx_list = next(self.iterater)
+        X,y=None,None
+        for idx in idx_list:
+            if X is None and y is None:
+                X,y = self.dataloader.dataset[idx]
+            else:
+                new_X, new_y = self.dataloader.dataset[idx]
+                X = np.vstack((X,new_X))
+                y = np.vstack((y,new_y))
+            
+        return MyTensor(X), MyTensor(y)
 
 class DataLoader:
     '''
     DataLoader 类，用于加载数据集
     '''
 
-    def __init__(self, dataset: Dataset, batch_size:int = 1, shuffle=False, drop_last: bool=False) -> None:
+    def __init__(self, dataset: Dataset, batch_size:int = 1, shuffle=False, drop_last: bool=True) -> None:
         '''
         初始化DataLoader
         input:

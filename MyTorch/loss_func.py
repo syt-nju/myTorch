@@ -9,7 +9,7 @@ Add CrossEntropyLoss
 #实现损失函数，forward基于已经实现的func.py的函数
 from typing import Tuple
 from MyTorch.myTensor import MyTensor,Op,ComputationalGraph
-from MyTorch import func
+from MyTorch import func,Mul,SumUnary,Log,Div,Sub
 import numpy as np
 class LossFunc(Op):
     '''
@@ -34,9 +34,22 @@ class LossFunc(Op):
         '''
         NotImplementedError
     def __call__(self, *args, **kwds):
-        self.last = []#清空上次的记录,以后就不用反复实例化了
+        #清空上次的记录,以后就不用反复实例化了
+        self.last = []
+        self.output = None
         return self.forward(*args, **kwds)
-       
+class LossFunc2():
+    '''小算子组合的损失函数基类'''
+    def forward(self,y_pred:MyTensor,y_true:MyTensor)->MyTensor:
+        '''
+        实现损失函数的前向传播
+        @param y_pred:模型的输出
+        @param y_true:真实标签
+        @return:结果的MyTensor形式
+        '''
+        NotImplementedError    
+    def __call__(self, *args, **kwds):
+        return self.forward(*args, **kwds)
 class MSELoss(LossFunc):
     def forward(self,y_pred:MyTensor, y_true:MyTensor, reduction = 'mean')->MyTensor:
         '''
@@ -88,7 +101,7 @@ class CrossEntropyLoss(LossFunc):
         if len(y_true.shape) == 1:
             print("y_true is not one-hot, converting to one-hot...")
             one_hot_y_true = np.zeros_like(y_pred.data)
-            one_hot_y_true[np.arange(y_true.shape[0]), y_true.data.astype(int)] = 1
+            one_hot_y_true[np.arange(y_true.shape[0]), y_true.data.astype(int)-1] = 1
             y_true = MyTensor(one_hot_y_true, requires_grad=False)
 
         self.reduction = reduction
@@ -139,7 +152,54 @@ class CrossEntropyLoss(LossFunc):
         
         return grad
 
+class NLLLoss(LossFunc2):
+    def forward(self, y_pred: MyTensor, y_true: MyTensor, reduction='mean') -> MyTensor:
+        '''
+        实现负对数似然损失函数
+        @param y_pred: 模型的输出（经过logSoftmax）
+        @param y_true: 真实标签，one-hot或索引表示
+        @param reduction: 选择返回损失是取平均还是求和
+        @return: 结果的 MyTensor 形式
+        '''
+        if isinstance(y_true, np.ndarray):
+            y_true = MyTensor(y_true, requires_grad=False)
         
+        # 检查形状是否匹配
+        assert y_pred.shape[0] == y_true.shape[0], 'shape not match'
+    
+        # 如果 y_true 是标签索引而非one-hot，需要转换成one-hot
+        if y_true.shape[1] != y_pred.shape[1]:
+            # print("y_true is not one-hot, converting to one-hot...")
+            one_hot_y_true = np.zeros((y_true.shape[0], y_pred.shape[1]))
+            one_hot_y_true[np.arange(y_true.shape[0]), y_true.data.astype(int)] = 1
+            y_true = MyTensor(one_hot_y_true, requires_grad=False)
+            
+            
+        self.reduction = reduction
+        # result = func.NLLLoss(y_pred, y_true, reduction)
+        # 因对于func.NLLLoss中的计算方法还有疑问因此暂时将这个修改后的实现直接放在这里
+        # 计算负对数似然损失
+        mul=Mul()
+        sumunary=SumUnary(axis=1)
+        div=Div()
+        sub=Sub()
+        mul_result=mul.forward(y_true,y_pred)
+        nll_loss=sumunary.forward(mul_result)
+        zeros=np.zeros_like(nll_loss.data)
+        zeros_mytensor=MyTensor(zeros,requires_grad=False)
+        nll_loss=sub.forward(zeros_mytensor,nll_loss)
+        
+        
+        if reduction == 'mean':
+            sumunary2=SumUnary(axis=0)
+            nll_loss=sumunary2.forward(nll_loss)
+            num=y_true.data.shape[0]
+            nll_loss=div.forward(nll_loss,MyTensor(np.array(num),requires_grad=False))
+        elif reduction == 'sum':
+            sumunary2=SumUnary(axis=0)
+            nll_loss=sumunary2.forward(nll_loss)
+        
+        return nll_loss
 if __name__ == "__main__":
     # #简单测试
     # y_pred = MyTensor(np.array([1,2,3,3]),requires_grad=True)
