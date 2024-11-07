@@ -171,9 +171,9 @@ class NLLLoss(LossFunc2):
         if y_true.shape[1] != y_pred.shape[1]:
             # print("y_true is not one-hot, converting to one-hot...")
             one_hot_y_true = np.zeros((y_true.shape[0], y_pred.shape[1]))
-            one_hot_y_true[np.arange(y_true.shape[0]), y_true.data.astype(int)] = 1
+            for i in range(y_true.shape[0]):
+                one_hot_y_true[i, y_true.data[i].astype(int)] = 1
             y_true = MyTensor(one_hot_y_true, requires_grad=False)
-            
             
         self.reduction = reduction
         # result = func.NLLLoss(y_pred, y_true, reduction)
