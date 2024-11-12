@@ -82,6 +82,41 @@ class MSELoss(LossFunc):
             return 2*(self.last[0].data-self.last[1].data)
         else:
             raise ValueError("reduction must be 'mean' or 'sum'")
+
+class MSEloss2(LossFunc2):
+    '''小算子组合的MSE,无需实例化，直接调用
+        @param y_pred:模型的输出
+        @param y_true:真实标签   
+    '''
+    def __init__(self,reduction='mean'):
+        self.reduction=reduction
+    def forward(self,y_pred:MyTensor, y_true:MyTensor)->MyTensor:
+        '''
+        实现均方误差损失函数(MSE)
+        @return:MyTensor 结果的MyTensor形式
+        '''
+        if isinstance(y_true,np.ndarray):
+            y_true=MyTensor(y_true,requires_grad=False)
+        #检查
+        assert y_pred.shape == y_true.shape,'shape not match'
+        assert y_pred.requires_grad==True,'y_pred must requires_grad'
+        assert y_true.requires_grad==False,'y_true must not requires_grad'
+        
+        #sum((y_pred-y_true)^2)
+        sub=Sub()
+        mul=Mul()
+        sumunary=SumUnary(axis=None)
+        sub_result=sub.forward(y_pred,y_true)
+        mul_result=mul.forward(sub_result,sub_result)
+        result=sumunary.forward(mul_result)
+        if self.reduction=='mean':
+            div=Div()
+            result=div.forward(result,MyTensor(np.array(y_pred.data.size),requires_grad=False))
+        elif self.reduction=='sum':
+            pass
+        else:
+            raise ValueError("reduction must be 'mean' or 'sum'")
+        return result
         
 class CrossEntropyLoss(LossFunc):
     def forward(self, y_pred: MyTensor, y_true: MyTensor, reduction='mean') -> MyTensor:
