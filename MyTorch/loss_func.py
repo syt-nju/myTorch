@@ -9,7 +9,7 @@ Add CrossEntropyLoss
 #实现损失函数，forward基于已经实现的func.py的函数
 from typing import Tuple
 from MyTorch.myTensor import MyTensor,Op,ComputationalGraph
-from MyTorch import func,Mul,SumUnary,Log,Div,Sub
+from MyTorch import func,Mul,SumUnary,Log,Div,Sub,Max,Exp
 import numpy as np
 class LossFunc(Op):
     '''
@@ -136,7 +136,7 @@ class CrossEntropyLoss(LossFunc):
         if len(y_true.shape) == 1:
             print("y_true is not one-hot, converting to one-hot...")
             one_hot_y_true = np.zeros_like(y_pred.data)
-            one_hot_y_true[np.arange(y_true.shape[0]), y_true.data.astype(int)-1] = 1
+            one_hot_y_true[np.arange(y_true.shape[0]), y_true.data.astype(int)] = 1
             y_true = MyTensor(one_hot_y_true, requires_grad=False)
 
         self.reduction = reduction
@@ -187,7 +187,78 @@ class CrossEntropyLoss(LossFunc):
         
         return grad
 
-class NLLLoss(LossFunc2):
+class CrossEntropyLoss2(LossFunc2):
+    '''
+    小算子组合的交叉熵损失函数
+    @param reduction:  Option['mean', 'sum']
+    '''
+    def __init__(self, reduction='mean'):
+        self.reduction = reduction
+    def forward(self, y_pred: MyTensor, y_true: MyTensor) -> MyTensor:
+        '''
+        实现交叉熵损失函数
+        @param y_pred: 模型的输出（未经过Softmax，直接传logits）
+        @param y_true: 真实标签，one-hot或索引表示
+        @return: 结果的 MyTensor 形式
+        '''
+        if isinstance(y_true, np.ndarray):
+            y_true = MyTensor(y_true, requires_grad=False)
+        
+        # 检查形状是否匹配
+        assert y_pred.shape[0] == y_true.shape[0], 'shape not match'
+        # 如果 y_true 是标签索引而非one-hot，需要转换成one-hot
+        if len(y_true.shape) == 1:
+            print("y_true is not one-hot, converting to one-hot...")
+            one_hot_y_true = np.zeros_like(y_pred.data)
+            for i in range(y_true.shape[0]):
+                one_hot_y_true[i, y_true.data[i].astype(int)] = 1
+            y_true = MyTensor(one_hot_y_true, requires_grad=False)
+        
+        # 计算 log(softmax)
+        # max_logit = np.max(y_pred.data, axis=1, keepdims=True)
+        # y_pred_sub_max = y_pred.data - max_logit
+        # log_sum_exp = np.log(np.sum(np.exp(y_pred_sub_max), axis=1, keepdims=True))
+        # simplified_cross = log_sum_exp - y_pred_sub_max
+        log=Log()
+        max=Max(axis=1,keepdims=True)
+        sub1=Sub()
+        sub2=Sub()
+        exp=Exp()
+        sumunary=SumUnary(axis=1,keepdims=True)
+        
+        max_logit=max.forward(y_pred)
+        y_pred_sub_max=sub1.forward(y_pred,max_logit)
+        exp_result=exp.forward(y_pred_sub_max)
+        sumunary_result=sumunary.forward(exp_result)
+        log_sum_exp=log.forward(sumunary_result)
+        simplified_cross=sub2.forward(log_sum_exp,y_pred_sub_max)
+        
+        # 交叉熵损失 = -真实标签的one-hot编码 * log(softmax)
+        mul=Mul()
+        sub3=Sub()
+        sumunary3=SumUnary(axis=1)
+        zeros_mytensor=MyTensor(np.zeros_like(y_true.data),requires_grad=False)
+        mul_result=mul.forward(y_true,simplified_cross)
+        cross_entropy_full_dim=sub3.forward(zeros_mytensor,mul_result)
+        cross_entropy=sumunary3.forward(cross_entropy_full_dim)
+        
+        
+        #reduction
+        if self.reduction == 'mean':
+            sumunary2=SumUnary(axis=0)
+            num=y_true.data.shape[0]
+            cross_entropy=sumunary2.forward(cross_entropy)
+            div=Div()
+            cross_entropy=div.forward(cross_entropy,MyTensor(np.array(num),requires_grad=False))
+        elif self.reduction == 'sum':
+            sumunary2=SumUnary(axis=0)
+            cross_entropy=sumunary2.forward(cross_entropy)
+        else:
+            raise ValueError("reduction must be 'mean' or 'sum'")
+        return cross_entropy
+
+        
+class NLLLoss2(LossFunc2):
     def forward(self, y_pred: MyTensor, y_true: MyTensor, reduction='mean') -> MyTensor:
         '''
         实现负对数似然损失函数
@@ -235,6 +306,7 @@ class NLLLoss(LossFunc2):
             nll_loss=sumunary2.forward(nll_loss)
         
         return nll_loss
+
 if __name__ == "__main__":
     # #简单测试
     # y_pred = MyTensor(np.array([1,2,3,3]),requires_grad=True)
