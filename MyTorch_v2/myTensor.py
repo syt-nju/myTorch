@@ -211,12 +211,12 @@ class MyTensor():
         #找到Tensor它的产生者的位置
         myAssert(self==ComputationalGraph.node_list[-1],"此tensor不是计算图最终输出",self)
 
-        self.grad=np.ones_like(self.data)
+        self.grad=np.ones_like(self.data).astype(self.data.dtype)
         for tensor in reversed(ComputationalGraph.node_list):
             if not tensor.is_leaf:
                 for i in tensor.father_tensor:
                     if i.requires_grad:
-                        i.grad+=tensor.father_op.grad_fn(i,tensor.grad,tensor.father_tensor.index(i))
+                        i.grad+=tensor.father_op.grad_fn(i,tensor.grad,tensor.father_tensor)
                 
         #清空计算图
         if not retain_graph:
@@ -281,13 +281,13 @@ class Add(Op):
         result_data=x.data+y.data
         return result_data
     @classmethod
-    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,index:int):
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor]):
         '''
         梯度计算
         params:
             x: MyTensor 求导对象
             last_grad: np.ndarray 上游梯度
-            index:求导对象在算式中的位置(0开始的index)
+            input_tensors: list[MyTensor] 函数输入的tensor
         '''
         return last_grad
 class Sub(Op):
@@ -303,7 +303,34 @@ class Sub(Op):
         result_data=x.data-y.data
         return result_data
     @classmethod
-    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,index:int):
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor]):
+        '''
+        梯度计算
+        params:
+            x: MyTensor 求导对象
+            last_grad: np.ndarray 上游梯度
+            input_tensors: list[MyTensor] 函数输入的tensor
+        '''
+        if x==input_tensors[0]:
+            return last_grad
+        elif x==input_tensors[1]:
+            return -last_grad
+        else:
+            raise ValueError("求导对象不在输入中")
+class Mul(Op):
+    '''
+    乘法
+    '''
+    @classmethod
+    @op_forward
+    def forward(cls, x:MyTensor, y:MyTensor):
+        '''
+        前向传播
+        '''
+        result_data=x.data*y.data
+        return result_data
+    @classmethod
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor]):
         '''
         梯度计算
         params:
@@ -311,12 +338,11 @@ class Sub(Op):
             last_grad: np.ndarray 上游梯度
             index:求导对象在算式中的位置(0开始的index)
         '''
-        if index==0:
-            return last_grad
-        elif index==1:
-            return -last_grad
+        if x==input_tensors[0]:
+            return last_grad*input_tensors[1].data
+        elif x==input_tensors[1]:
+            return last_grad*input_tensors[0].data
         else:
-            raise ValueError("index out of range")
-    
+            raise ValueError("求导对象不在输入中")
     
     
