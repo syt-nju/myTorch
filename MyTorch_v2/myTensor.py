@@ -216,7 +216,7 @@ class MyTensor():
             if not tensor.is_leaf:
                 for i in tensor.father_tensor:
                     if i.requires_grad:
-                        i.grad+=tensor.father_op.grad_fn(i,tensor.grad)
+                        i.grad+=tensor.father_op.grad_fn(i,tensor.grad,tensor.father_tensor.index(i))
                 
         #清空计算图
         if not retain_graph:
@@ -281,14 +281,42 @@ class Add(Op):
         result_data=x.data+y.data
         return result_data
     @classmethod
-    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray):
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,index:int):
         '''
         梯度计算
         params:
             x: MyTensor 求导对象
             last_grad: np.ndarray 上游梯度
+            index:求导对象在算式中的位置(0开始的index)
         '''
         return last_grad
-        
+class Sub(Op):
+    '''
+    减法
+    '''
+    @classmethod
+    @op_forward
+    def forward(cls, x:MyTensor, y:MyTensor):
+        '''
+        前向传播
+        '''
+        result_data=x.data-y.data
+        return result_data
+    @classmethod
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,index:int):
+        '''
+        梯度计算
+        params:
+            x: MyTensor 求导对象
+            last_grad: np.ndarray 上游梯度
+            index:求导对象在算式中的位置(0开始的index)
+        '''
+        if index==0:
+            return last_grad
+        elif index==1:
+            return -last_grad
+        else:
+            raise ValueError("index out of range")
+    
     
     
