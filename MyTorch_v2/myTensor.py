@@ -216,7 +216,7 @@ class MyTensor():
             if not tensor.is_leaf:
                 for i in tensor.father_tensor:
                     if i.requires_grad:
-                        i.grad+=tensor.father_op.grad_fn(i,tensor.grad,tensor.father_tensor)
+                        i.grad+=tensor.father_op.grad_fn(i,tensor.grad,tensor.father_tensor,axis=tensor.axis,keepdims=tensor.keepdims)
                 
         #清空计算图
         if not retain_graph:
@@ -240,13 +240,15 @@ def op_forward(forward_func):
     '''
     修饰器，用于Op的forward方法
     '''
-    def wrapper(cls, *args):
+    def wrapper(cls, *args,axis=0,keepdims=False):
         device=args[0].device
         myAssert(all(arg.device == device for arg in args), "device must be the same",device)
-        data=forward_func(cls,*args)
+        data=forward_func(cls,*args,axis=axis,keepdims=keepdims)
         result = MyTensor(data, requires_grad= not all(not arg.requires_grad for arg in args), device=device)
         result.father_tensor=args
         result.father_op=cls
+        result.axis=axis
+        result.keepdims=keepdims
         return result
     return wrapper
 class Op():
@@ -274,14 +276,14 @@ class Add(Op):
     '''
     @classmethod
     @op_forward
-    def forward(cls, x:MyTensor, y:MyTensor):
+    def forward(cls, x:MyTensor, y:MyTensor,**kwargs):
         '''
         前向传播
         '''
         result_data=x.data+y.data
         return result_data
     @classmethod
-    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor]):
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
         '''
         梯度计算
         params:
@@ -296,14 +298,14 @@ class Sub(Op):
     '''
     @classmethod
     @op_forward
-    def forward(cls, x:MyTensor, y:MyTensor):
+    def forward(cls, x:MyTensor, y:MyTensor,**kwargs):
         '''
         前向传播
         '''
         result_data=x.data-y.data
         return result_data
     @classmethod
-    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor]):
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
         '''
         梯度计算
         params:
@@ -323,20 +325,20 @@ class Mul(Op):
     '''
     @classmethod
     @op_forward
-    def forward(cls, x:MyTensor, y:MyTensor):
+    def forward(cls, x:MyTensor, y:MyTensor,**kwargs):
         '''
         前向传播
         '''
         result_data=x.data*y.data
         return result_data
     @classmethod
-    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor]):
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
         '''
         梯度计算
         params:
             x: MyTensor 求导对象
             last_grad: np.ndarray 上游梯度
-            index:求导对象在算式中的位置(0开始的index)
+            input_tensors: list[MyTensor] 函数输入的tensor
         '''
         if x==input_tensors[0]:
             return last_grad*input_tensors[1].data
@@ -350,20 +352,20 @@ class MatMul(Op):
     '''
     @classmethod
     @op_forward
-    def forward(cls, x:MyTensor, y:MyTensor):
+    def forward(cls, x:MyTensor, y:MyTensor,**kwargs):
         '''
         前向传播
         '''
         result_data=np.matmul(x.data,y.data)
         return result_data
     @classmethod
-    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor]):
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
         '''
         梯度计算
         params:
             x: MyTensor 求导对象
             last_grad: np.ndarray 上游梯度
-            index:求导对象在算式中的位置(0开始的index)
+            input_tensors: list[MyTensor] 函数输入的tensor
         '''
         is_a_broadcast,is_b_broadcast=input_tensors[0].ndim<2,input_tensors[1].ndim<2
         if is_a_broadcast:
@@ -390,20 +392,20 @@ class Div(Op):
     '''
     @classmethod
     @op_forward
-    def forward(cls, x:MyTensor, y:MyTensor):
+    def forward(cls, x:MyTensor, y:MyTensor,**kwargs):
         '''
         前向传播
         '''
         result_data=x.data/y.data
         return result_data
     @classmethod
-    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor]):
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
         '''
         梯度计算
         params:
             x: MyTensor 求导对象
             last_grad: np.ndarray 上游梯度
-            index:求导对象在算式中的位置(0开始的index)
+            input_tensors: list[MyTensor] 函数输入的tensor
         '''
         if x==input_tensors[0]:
             return last_grad/input_tensors[1].data
@@ -411,3 +413,36 @@ class Div(Op):
             return -last_grad*input_tensors[0].data/input_tensors[1].data**2
         else:
             raise ValueError("求导对象不在输入中")
+class Max(Op):
+    '''
+    最大值
+    '''
+    @classmethod
+    @op_forward
+    def forward(cls, x:MyTensor, **kwargs):
+        '''
+        前向传播
+        params:
+            x: MyTensor 输入
+            axis: int 求最大值的轴
+            keepdims: bool 是否保留维度
+        '''
+        assert "axis" in kwargs, "kwargs must contain 'axis'"
+        assert "keepdims" in kwargs, "kwargs must contain 'keepdims'"
+        result_data=np.max(x.data, axis=kwargs["axis"], keepdims=kwargs["keepdims"])
+        return result_data
+    @classmethod
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
+        '''
+        梯度计算
+        params:
+            x: MyTensor 求导对象
+            last_grad: np.ndarray 上游梯度
+            input_tensors: list[MyTensor] 函数输入的tensor
+        '''
+        axis=kwargs["axis"]
+        keepdims=kwargs["keepdims"]
+        if not keepdims:
+            last_grad=np.expand_dims(last_grad,axis=axis)
+        mask=np.equal(x.data,np.max(x.data,axis=axis,keepdims=True))
+        return last_grad*mask
