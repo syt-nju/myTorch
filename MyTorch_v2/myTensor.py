@@ -446,3 +446,47 @@ class Max(Op):
             last_grad=np.expand_dims(last_grad,axis=axis)
         mask=np.equal(x.data,np.max(x.data,axis=axis,keepdims=True))
         return last_grad*mask
+class Exp(Op):
+    '''
+    指数
+    '''
+    @classmethod
+    @op_forward
+    def forward(cls, x:MyTensor, **kwargs):
+        '''
+        前向传播
+        '''
+        result_data=np.exp(x.data)
+        return result_data
+    @classmethod
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
+        '''
+        梯度计算
+        params:
+            x: MyTensor 求导对象
+            last_grad: np.ndarray 上游梯度
+            input_tensors: list[MyTensor] 函数输入的tensor
+        '''
+        return last_grad*np.exp(x.data)
+class Log(Op):
+    '''
+    对数
+    '''
+    @classmethod
+    @op_forward
+    def forward(cls, x:MyTensor, **kwargs):
+        '''
+        前向传播
+        '''
+        result_data=np.log(x.data)
+        return result_data
+    @classmethod
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
+        '''
+        梯度计算
+        params:
+            x: MyTensor 求导对象
+            last_grad: np.ndarray 上游梯度
+            input_tensors: list[MyTensor] 函数输入的tensor
+        '''
+        return last_grad/x.data
