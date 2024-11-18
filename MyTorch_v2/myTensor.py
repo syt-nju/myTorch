@@ -344,5 +344,70 @@ class Mul(Op):
             return last_grad*input_tensors[0].data
         else:
             raise ValueError("求导对象不在输入中")
-    
-    
+class MatMul(Op):
+    '''
+    矩阵乘法
+    '''
+    @classmethod
+    @op_forward
+    def forward(cls, x:MyTensor, y:MyTensor):
+        '''
+        前向传播
+        '''
+        result_data=np.matmul(x.data,y.data)
+        return result_data
+    @classmethod
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor]):
+        '''
+        梯度计算
+        params:
+            x: MyTensor 求导对象
+            last_grad: np.ndarray 上游梯度
+            index:求导对象在算式中的位置(0开始的index)
+        '''
+        is_a_broadcast,is_b_broadcast=input_tensors[0].ndim<2,input_tensors[1].ndim<2
+        if is_a_broadcast:
+            last_grad=np.expand_dims(last_grad,axis=0)
+        if is_b_broadcast:
+            last_grad=np.expand_dims(last_grad,axis=-1)
+        
+        if x==input_tensors[0]:
+            grad=last_grad@np.atleast_2d(input_tensors[1].data) if is_b_broadcast else last_grad@input_tensors[1].data.swapaxes(-1,-2)
+            if is_a_broadcast:
+                grad=grad[0]
+            return grad
+        elif x==input_tensors[1]:
+            
+            grad= np.atleast_2d(input_tensors[0].data).swapaxes(-1,-2)@last_grad if is_a_broadcast else input_tensors[0].data.swapaxes(-1,-2)@last_grad
+            if is_b_broadcast:
+                grad=[...,0]
+            return grad
+        else:
+            raise ValueError("求导对象不在输入中")
+class Div(Op):
+    '''
+    除法
+    '''
+    @classmethod
+    @op_forward
+    def forward(cls, x:MyTensor, y:MyTensor):
+        '''
+        前向传播
+        '''
+        result_data=x.data/y.data
+        return result_data
+    @classmethod
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor]):
+        '''
+        梯度计算
+        params:
+            x: MyTensor 求导对象
+            last_grad: np.ndarray 上游梯度
+            index:求导对象在算式中的位置(0开始的index)
+        '''
+        if x==input_tensors[0]:
+            return last_grad/input_tensors[1].data
+        elif x==input_tensors[1]:
+            return -last_grad*input_tensors[0].data/input_tensors[1].data**2
+        else:
+            raise ValueError("求导对象不在输入中")

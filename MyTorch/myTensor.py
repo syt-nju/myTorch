@@ -441,8 +441,6 @@ class MatMul(Op):
         myAssert(args[0].shape[1]==args[1].shape[0],"MatMul shape error")
         myAssert(all(arg.device == self.device for arg in args), "device must be the same",self.device)
         
-        #算出结果
-        self.a_one_dimen,self.b_one_dimen=args[0].ndim<2,args[1].ndim<2#记录是否是一维,由于其一维matmul的特殊性需要进行特殊处理
         #记录下是否出现矩阵一维导致的broadcast
         self.is_a_broadcast,self.is_b_broadcast=args[0].ndim<2,args[1].ndim<2
         
@@ -473,7 +471,7 @@ class MatMul(Op):
         '''
         #规范上游梯度的ndim问题
         if self.is_a_broadcast:
-            np.expand_dims(grad,axis=   0)
+            np.expand_dims(grad,axis=0)
         if self.is_b_broadcast:
             np.expand_dims(grad,axis=-1)
             
