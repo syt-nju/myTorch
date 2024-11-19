@@ -39,3 +39,23 @@
 > 这是group ViT论文中的group block，用于做软聚类
 >
 > 最大的差别是，注意力机制把value做了加权和，这里是保留了整个加权矩阵，可以看作向多个聚类中心聚类的结果。只需调节gumble softmax的温度，使得系数逼近 0/1 ，那么最终结果就是良好的软聚类，还维持了可导的性质
+
+## batchnorm 和 layernorm 的作用和区别
+
+为什么要做数据归一化？
+
+>保证所有特征在同一刻度下进行传递和比较
+>
+>如果不做归一化，数值较大的特征会在等weight下会计算出更大的结果，**淹没**其它特征带来的影响。
+>
+>在随机梯度下降的时候，假设y=aw+bw+cw, 如果a特别大，会导致梯度基本上由**a**决定，导致在**其它方向**上的优化极慢。(如图，像只有一边及其陡峭的峡谷)
+
+![image-20241119004531218](https://typorasyt.oss-cn-nanjing.aliyuncs.com/202411190045271.png)
+
+batch norm在干一件什么事
+
+>batch norm 在把一个batch的数据归一化(均值和方差由batch的值求出并进行动量式更新，并非人为规定)，再通过可以学习的超参数进行放缩移动到任意均值、方差的分布
+
+![image-20241119005111755](https://typorasyt.oss-cn-nanjing.aliyuncs.com/202411190051954.png)
+
+> batchnorm和layernorm做的东西相似，batch norm是一个特征一个特征归一化，layernorm是对一个样本一个样本归一化，核心原因是在nlp领域，样本经常是个sequence，长度不定，此时对batch做normalization会导致很多比较后面的token跟一堆0一起算，显然会出问题，于是采用layernorm，对每个样本进行归一化。
