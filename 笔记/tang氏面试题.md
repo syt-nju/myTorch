@@ -59,3 +59,16 @@ batch norm在干一件什么事
 ![image-20241119005111755](https://typorasyt.oss-cn-nanjing.aliyuncs.com/202411190051954.png)
 
 > batchnorm和layernorm做的东西相似，batch norm是一个特征一个特征归一化，layernorm是对一个样本一个样本归一化，核心原因是在nlp领域，样本经常是个sequence，长度不定，此时对batch做normalization会导致很多比较后面的token跟一堆0一起算，显然会出问题，于是采用layernorm，对每个样本进行归一化。
+
+## 为什么numpy 比 list快
+
+> list 慢是显然的，他不是连续内存且存的东西不固定类型，批量处理肯定慢
+>
+> numpy有几个优势：
+>
+> ​	1.底层实现为C等更机器级别的语言，本身编译速度快
+>
+> ​	2.为同类型集中存储，适合一坨一次性搬进**缓存**，加快访问速度
+>
+> ​    3.向量化操作：对于向量的计算有着良好的可**并行**特性，numpy实现上做了并行化，充分利用CPU资源
+

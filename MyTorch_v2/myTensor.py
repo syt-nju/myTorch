@@ -75,7 +75,7 @@ class MyTensor():
         '''
         重写加法运算
         '''
-        Add(self,other)
+        return Sum.forward(self,other)
 
     def __radd__(self, other):
         '''
@@ -87,10 +87,7 @@ class MyTensor():
         '''
         重写减法运算
         '''
-        if isinstance(other, MyTensor):
-            self.data = self.data - other.data
-        else:
-            raise TypeError("MyTensor can only subtract MyTensor")
+        return Sub.forward(self,other)
 
     def __rsub__(self, other):
         '''
@@ -103,10 +100,7 @@ class MyTensor():
         重写乘法运算
         这是对应位置相乘，参考numpy的乘法
         '''
-        if isinstance(other, MyTensor):
-            self.data = self.data * other.data
-        else:
-            raise TypeError("MyTensor can only multiply MyTensor")
+        return Mul.forward(self,other)
 
     def __rmul__(self, other):
         '''
@@ -118,20 +112,12 @@ class MyTensor():
         '''
         重写矩阵乘法运算
         '''
-        if isinstance(other, MyTensor):
-            self.data = np.matmul(self.data, other.data)
-        else:
-            raise TypeError("MyTensor can only matmul MyTensor")
+        return MatMul.forward(self,other)
     def __truediv__(self, other):
         '''
         重写除法运算
         '''
-        if isinstance(other, MyTensor):
-            self.data = self.data / other.data
-        elif isinstance(other, (int, float)):
-            self.data = self.data / other
-        else:
-            raise TypeError("MyTensor can only divide MyTensor or number")
+        Div.forward(self,other)
     def __rtruediv__(self, other):
         '''
         重写反向除法运算
@@ -217,7 +203,7 @@ class MyTensor():
                 for i in tensor.father_tensor:
                     if i.requires_grad:
                         i.grad+=tensor.father_op.grad_fn(i,tensor.grad,tensor.father_tensor,axis=tensor.axis,keepdims=tensor.keepdims)
-                
+
         #清空计算图
         if not retain_graph:
             ComputationalGraph.clear()
@@ -270,7 +256,7 @@ class Op():
         raise NotImplementedError
     
 
-class Add(Op):
+class Sum(Op):
     '''
     加法
     '''
@@ -374,7 +360,7 @@ class MatMul(Op):
             last_grad=np.expand_dims(last_grad,axis=-1)
         
         if x==input_tensors[0]:
-            grad=last_grad@np.atleast_2d(input_tensors[1].data) if is_b_broadcast else last_grad@input_tensors[1].data.swapaxes(-1,-2)
+            grad=(last_grad@np.atleast_2d(input_tensors[1].data)) if is_b_broadcast else (last_grad@input_tensors[1].data.swapaxes(-1,-2))
             if is_a_broadcast:
                 grad=grad[0]
             return grad
