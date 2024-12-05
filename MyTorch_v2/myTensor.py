@@ -432,6 +432,39 @@ class Max(Op):
             last_grad=np.expand_dims(last_grad,axis=axis)
         mask=np.equal(x.data,np.max(x.data,axis=axis,keepdims=True))
         return last_grad*mask
+class Min(Op):
+    '''
+    最小值
+    '''
+    @classmethod
+    @op_forward
+    def forward(cls, x:MyTensor, **kwargs):
+        '''
+        前向传播
+        params:
+            x: MyTensor 输入
+            axis: int 求最大值的轴
+            keepdims: bool 是否保留维度
+        '''
+        assert "axis" in kwargs, "kwargs must contain 'axis'"
+        assert "keepdims" in kwargs, "kwargs must contain 'keepdims'"
+        result_data=np.min(x.data, axis=kwargs["axis"], keepdims=kwargs["keepdims"])
+        return result_data
+    @classmethod
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
+        '''
+        梯度计算
+        params:
+            x: MyTensor 求导对象
+            last_grad: np.ndarray 上游梯度
+            input_tensors: list[MyTensor] 函数输入的tensor
+        '''
+        axis=kwargs["axis"]
+        keepdims=kwargs["keepdims"]
+        if not keepdims:
+            last_grad=np.expand_dims(last_grad,axis=axis)
+        mask=np.equal(x.data,np.min(x.data,axis=axis,keepdims=True))
+        return last_grad*mask
 class Exp(Op):
     '''
     指数
