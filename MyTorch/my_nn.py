@@ -1,9 +1,11 @@
-from typing import Tuple
+from MyTorch.myTensor import MyTensor,MyTensor,MatMul,Sum,Mul,Max,Exp,Log,Sub,SumUnary,Div
+from MyTorch.myTensor import ComputationalGraph,op_forward,Op
 from MyTorch.utils.utils import *
-from MyTorch.myTensor import MyTensor,MatMul,Sum,Op,Mul,Max,Exp,Log,Sub,SumUnary,Div
-from MyTorch.myTensor import ComputationalGraph
 import numpy as np
-class Sequential():
+class ModuleBase():
+    def __call__(self, *args, **kwds):
+        return self.forward(*args, **kwds)
+class Sequential(ModuleBase):
     def __init__(self,*args) -> None:
         self.layers = list(args)
         self.parameters = []
@@ -13,6 +15,7 @@ class Sequential():
     def forward(self,x:MyTensor)->MyTensor:
         for layer in self.layers:
             x = layer.forward(x)
+            # print(f"layer:{layer.__class__.__name__},output:{x}")
         return x
     def __repr__(self) -> str:
         
@@ -27,8 +30,9 @@ class Sequential():
         return self.layers[index]
     def __call__(self,x:MyTensor)->MyTensor:
         return self.forward(x)
-class MyLinearLayer():
-    def __init__(self,fan_in:int,fan_out:int,initial_policy:str = 'random') -> None:
+    
+class MyLinearLayer(ModuleBase):
+    def __init__(self,fan_in:int,fan_out:int,initial_policy:str = 'xavier') -> None:
         '''
            @fan_in:输入维度
            @fan_out:输出维度
@@ -46,6 +50,9 @@ class MyLinearLayer():
         if initial_policy=='He':
             self.weight = MyTensor(np.random.randn(fan_in,fan_out)*np.sqrt(2/fan_in),requires_grad=True)
             self.bias = MyTensor(np.random.randn(fan_out)*np.sqrt(2/fan_in),requires_grad=True)
+        self.bias.data = self.bias.data.reshape(1,-1)
+        if self.bias.requires_grad:
+            self.bias.grad = self.bias.grad.reshape(1,-1)
         self.parameters = [self.weight,self.bias]
     def __str__(self) -> str:
         return 'MyLinearLayer('+str(self.weight.shape[0])+','+str(self.weight.shape[1])+')'
@@ -55,33 +62,13 @@ class MyLinearLayer():
         #检查形状
         if x.data.ndim == 1:
             x.data = x.data.reshape(1,-1)
+            if x.requires_grad:
+                x.grad = x.grad.reshape(1,-1)
         myAssert(x.shape[1] == self.weight.shape[0],'shape not match')
-        
-        matmul=MatMul()
-        matmul.forward(x,self.weight)
-        add=Sum()
-        add.forward(matmul.output,self.bias)
-        return add.output
-class MLP():
-    def __init__(self,input_size:int,hidden_size:int,output_size:int,initial_policy:str = 'random') -> None:
-        '''
-           initial_policy:初始化策略，可以是'random','zeros,'xavier','He'
-        '''
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.output_size = output_size        
-        self.layer1 = MyLinearLayer(input_size,hidden_size,initial_policy)
-        self.layer2 = MyLinearLayer(hidden_size,output_size,initial_policy)
-        self.parameters = [self.layer1.weight,self.layer1.bias,self.layer2.weight,self.layer2.bias]
-    def forward(self,x:MyTensor)->MyTensor:
-        return self.layer2.forward(self.layer1.forward(x))
-    def __repr__(self) -> str:
-        layer1 = 'Layer1:\n' + 'weight:\n' + str(self.layer1.weight) + '\nbias:\n' + str(self.layer1.bias) + '\n'
-        layer2 = 'Layer2:\n' + 'weight:\n' + str(self.layer2.weight) + '\nbias:\n' + str(self.layer2.bias) + '\n'
-        return 'MLP:'+'\n'+layer1+layer2
-    def __str__(self):
-        return f"MLP({self.input_size},{self.hidden_size},{self.output_size})"
-class Softmax():#采用小算子的forward来实现计算图的构建
+        temp=MatMul.forward(x,self.weight)
+        result=Sum.forward(temp,self.bias)
+        return result
+class Softmax(ModuleBase):#采用小算子的forward来实现计算图的构建
     def __init__(self,dim=0) -> None:
         '''@dim:指定沿哪个维度应用softmax'''
         self.dim = dim
@@ -90,69 +77,34 @@ class Softmax():#采用小算子的forward来实现计算图的构建
                 exp = np.exp(x_sub_max)
                 exp_sum = np.sum(exp, axis = dim, keepdims = True)
                 x.data = exp/exp_sum'''
-        sub_1=Sub()
-        max=Max(axis=self.dim,keepdims=True)
-        exp_1=Exp()
-        sumunary=SumUnary(axis=self.dim,keepdims=True)
-        div=Div()
         
-        
-        x_sub_max = sub_1.forward(x,max.forward(x))
-        exp=exp_1.forward(x_sub_max)
-        exp_sum=sumunary.forward(exp)
-        result=div.forward(exp,exp_sum)
+        x_sub_max = Sub.forward(x,Max.forward(x,axis=self.dim,keepdims=True))
+        exp=Exp.forward(x_sub_max)
+        exp_sum=SumUnary.forward(exp,axis=self.dim,keepdims=True)
+        result=Div.forward(exp,exp_sum)
         return result
-class LogSoftmax():
+class LogSoftmax(ModuleBase):
     def __init__(self,dim=0) -> None:
         self.dim = dim
     def forward(self,x:MyTensor)->MyTensor:
         '''        x_sub_max = x.data - np.max(x.data, axis = axis, keepdims = keepdims)
     x.data =  x_sub_max - np.log(np.sum(np.exp(x_sub_max), axis = axis, keepdims = keepdims))'''
-        sub_1=Sub()
-        max=Max(axis=self.dim,keepdims=True)
-        exp_1=Exp()
-        sumunary=SumUnary(axis=self.dim,keepdims=True)
-        log=Log()
-        sub_2=Sub()
         
-        x_sub_max = sub_1.forward(x,max.forward(x))
-        exp=exp_1.forward(x_sub_max)
-        exp_sum=sumunary.forward(exp)
-        result = sub_2.forward(x_sub_max,log.forward(exp_sum))
+        
+        x_sub_max = Sub.forward(x,Max.forward(x,axis=self.dim,keepdims=True))
+        exp=Exp.forward(x_sub_max)
+        exp_sum=SumUnary.forward(exp,axis=self.dim,keepdims=True)
+        result = Sub.forward(x_sub_max,Log.forward(exp_sum))
         return result
 class ReLU(Op):
-    def forward(self,*args)->MyTensor:
+    @op_forward
+    def forward(self,*args,**kwargs)->MyTensor:
         '''    x.data = np.maximum(x.data, 0)'''
-        myAssert(args.__len__()==1, "Relu must have 1 arguments")
-        
-        result = np.maximum(args[0].data, 0)
-        z = MyTensor(result,requires_grad= not all(not arg.requires_grad for arg in args), device=self.device)
-        ComputationalGraph.add_node(self)
-        z.father_Op = self
-        self.last.extend(list(args))
-        self.output=z
-        return z
-    def grad_func(self, node,grad: np.ndarray) -> np.ndarray:
-        return grad * (self.last[0].data > 0)
+        result=np.maximum(args[0],0)
+        return result  
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
+        '''    grad = np.where(x.data > 0, grad, 0)'''
+        result = np.where(x.data>0,last_grad,0)     
+        return result
     def __repr__(self) -> str:
         return 'ReLU()'
-        
-    
-if __name__ == "__main__":
-    # #测试MyLinearLayer
-    # layer = MyLinearLayer(1,3,initial_policy='zeros')
-    # x = MyTensor([9],requires_grad=False)
-    # y = layer.forward(x)
-    # y.backward()
-    # print(layer.weight.grad)
-    # print(layer.bias.grad)
-    #测试MLP
-    mlp = MLP(2,3,2,initial_policy='random')
-    x = MyTensor(np.array([1,2]),requires_grad=False)
-    y = mlp.forward(x)
-    y.backward()
-    print(mlp)
-    
-        
-        
-        

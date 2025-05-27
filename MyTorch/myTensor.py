@@ -1,26 +1,7 @@
-#基于numpy 构建基本的Tensor类
-from typing import Union, Tuple,Optional
 import numpy as np
-from MyTorch.autograd import no_grad, is_grad_enabled 
-from MyTorch.utils import *
-import random
-import warnings
-
-READSIGN=114514#作为标记，无实际意义
-#构建基础版Tensor类
-#meta 类，定义一些需要的基本属性和简单初始化 
-class TensorMeta(type):
-    '''
-    Tensor 的 meta 类,定义 Tensor 在类最最初始时的初始化
-    '''
-    def __init__(cls, name, bases, attrs):
-        '''
-        初始化Tensor类,执行顺序高于子类init
-        '''
-        super(TensorMeta, cls).__init__(name, bases, attrs)
-        
-
-#目前就是个list，以后可能会加入更多的属性
+from MyTorch.utils.utils import myAssert
+#重构一版,修改计算图进入逻辑以更贴合pytorch
+#这版计算图只存tensor
 class ComputationalGraph():
     node_list=list()
     def __init__(self):
@@ -47,28 +28,33 @@ class ComputationalGraph():
         '''
         return cls.node_list.index(node)
 
-    
-
-
-
-class MyTensor(metaclass=TensorMeta):
+class MyTensor():
     '''
     自定义的Tensor类
+    
+    parameters:
+        data: np.ndarray 数据
+        requires_grad: bool 是否需要梯度
+        device: str 设备
+        dtype
     '''
-    def __init__(self, data:np.ndarray, requires_grad=False, device="cpu", dtype=float):
+    def __init__(self, data:np.ndarray, requires_grad=False, device="cpu", dtype=float,fatherop=None):
         '''
         初始化Tensor
         '''
         self.data = data.astype(dtype)
         self.device = device
         self.requires_grad = requires_grad  
-        self.father_Op:Op=None
+        self.father_op=fatherop
+        self.father_tensor=list()
 
         
         if self.requires_grad and self.data.dtype != float:
             raise TypeError("only float tensor can require gradients")
         if self.requires_grad:
             self.grad = np.zeros_like(data,dtype=dtype)
+            #将自己加入计算图
+            ComputationalGraph.add_node(self)
         else:
             self.grad = None
 
@@ -89,10 +75,7 @@ class MyTensor(metaclass=TensorMeta):
         '''
         重写加法运算
         '''
-        if isinstance(other, MyTensor):
-            self.data = self.data + other.data
-        else:
-            raise TypeError("MyTensor can only add MyTensor")
+        return Sum.forward(self,other)
 
     def __radd__(self, other):
         '''
@@ -104,10 +87,7 @@ class MyTensor(metaclass=TensorMeta):
         '''
         重写减法运算
         '''
-        if isinstance(other, MyTensor):
-            self.data = self.data - other.data
-        else:
-            raise TypeError("MyTensor can only subtract MyTensor")
+        return Sub.forward(self,other)
 
     def __rsub__(self, other):
         '''
@@ -120,10 +100,7 @@ class MyTensor(metaclass=TensorMeta):
         重写乘法运算
         这是对应位置相乘，参考numpy的乘法
         '''
-        if isinstance(other, MyTensor):
-            self.data = self.data * other.data
-        else:
-            raise TypeError("MyTensor can only multiply MyTensor")
+        return Mul.forward(self,other)
 
     def __rmul__(self, other):
         '''
@@ -135,20 +112,12 @@ class MyTensor(metaclass=TensorMeta):
         '''
         重写矩阵乘法运算
         '''
-        if isinstance(other, MyTensor):
-            self.data = np.matmul(self.data, other.data)
-        else:
-            raise TypeError("MyTensor can only matmul MyTensor")
+        return MatMul.forward(self,other)
     def __truediv__(self, other):
         '''
         重写除法运算
         '''
-        if isinstance(other, MyTensor):
-            self.data = self.data / other.data
-        elif isinstance(other, (int, float)):
-            self.data = self.data / other
-        else:
-            raise TypeError("MyTensor can only divide MyTensor or number")
+        Div.forward(self,other)
     def __rtruediv__(self, other):
         '''
         重写反向除法运算
@@ -214,7 +183,7 @@ class MyTensor(metaclass=TensorMeta):
         '''
         判断是否是叶子节点(基于前向传播的DAG图)
         '''
-        if self.father_Op==None:
+        if self.father_op==None:
             return True
         else:
             return False
@@ -226,14 +195,15 @@ class MyTensor(metaclass=TensorMeta):
             retain_graph: bool 是否保留计算图
         '''
         #找到Tensor它的产生者的位置
-        myAssert(self.father_Op==ComputationalGraph.node_list[-1],"我们强制要求有且仅有一个Tensor作为输出，其生成它的op必须是op list中的最后一个，这里违背了这个规则")
-        #把自己的梯度设置为1，用于bp
-        self.grad=np.ones_like(self.data)
-        for op in ComputationalGraph.node_list[::-1]:
-            op.op_backward()
-        #清空自己的梯度，最终输出一定不需要梯度
-        self.grad=None
-        
+        myAssert(self==ComputationalGraph.node_list[-1],"此tensor不是计算图最终输出",self)
+
+        self.grad=np.ones_like(self.data).astype(self.data.dtype)
+        for tensor in reversed(ComputationalGraph.node_list):
+            if not tensor.is_leaf:
+                for i in tensor.father_tensor:
+                    if i.requires_grad:
+                        i.grad+=tensor.father_op.grad_fn(i,tensor.grad,tensor.father_tensor,axis=tensor.axis,keepdims=tensor.keepdims)
+
         #清空计算图
         if not retain_graph:
             ComputationalGraph.clear()
@@ -252,409 +222,285 @@ class MyTensor(metaclass=TensorMeta):
 
     def sum(self, axis = None, keepdims: bool = False):
         return np.sum(self, axis, keepdims)
-
-
-            
-#TODO: 实现基本的操作类,支持梯度传播
-#区别于学长的torch，我通读代码后，发现实际上算子并不需要继承自Tensor，实际使用的时候，算子只需要对device，require_grad进行要求即可
-#所以这里新建一个算子类，无需继承自算子类
-class Op:
+def op_forward(forward_func):
     '''
-    算子类
+    修饰器，用于Op的forward方法
     '''
-    device='cpu'
-    def __init__(self, device: str = "cpu", requires_grad: bool = False) -> None:
-        self.last=list()
-        self.output=None
-
+    def wrapper(cls, *args,axis=0,keepdims=False):
+        device=args[0].device
+        myAssert(all(arg.device == device for arg in args), "device must be the same",device)
+        data=forward_func(cls,*args,axis=axis,keepdims=keepdims)
+        result = MyTensor(data, requires_grad= not all(not arg.requires_grad for arg in args), device=device)
+        result.father_tensor=args
+        result.father_op=cls
+        result.axis=axis
+        result.keepdims=keepdims
+        return result
+    return wrapper
+class Op():
+    '''
+    Op的元类
+    '''
     @classmethod
-    def change_device(cls, device: str) -> None:
+    def forward(cls, *args):
         '''
-        改变算子的设备
+        前向传播
         '''
-        cls.device = device
-    def forward(self, *args: Tuple[MyTensor]) -> MyTensor:
+        raise NotImplementedError
+    
+    @classmethod
+    def grad_fn(cls):
         '''
-        forward 流程：
-            1.计算并创建最新的Tensor
-            2.将当前算子添加到计算图中
-            3.添加最新的Tensor的father_Op属性
-            4.记录算子的输入到self.last
-            5.记录算子的输出output
+        梯度计算
         '''
-        NotImplementedError
-
-    def grad_func(self, grad: np.ndarray) -> np.ndarray:
-        '''
-        梯度传播
-        '''
-        NotImplementedError
-    def op_backward(self):
-        '''
-        单个算子的反向传播
-        '''
-        for node in self.last:
-            if node.requires_grad:
-                #handle broadcast
-                add_grad=self.grad_func(node,self.output.grad)
-                if node.grad.shape!=add_grad.shape:
-                    #找到被广播的维度
-                    broadcast_axis=[-i for i in range(1,node.grad.ndim+1) if node.grad.shape[-i]==1]     
-                    add_grad=np.sum(add_grad,axis=tuple(broadcast_axis),keepdims=True)#求均值压缩
-                    if node.grad.ndim<add_grad.ndim:
-                        add_grad=np.sum(add_grad,axis=tuple(range(add_grad.ndim-node.grad.ndim)))#把延长的维度进行压缩，这里无所谓sum还是mean，理想状态下应该前几个维度大小都为1
-                node.grad+=add_grad
-                    
-                    
-
-
+        raise NotImplementedError
+    
 
 class Sum(Op):
     '''
-    加法算子, 继承自BinaryOp
+    加法
     '''
-    def forward(self, *args) -> MyTensor:
+    @classmethod
+    @op_forward
+    def forward(cls, x:MyTensor, y:MyTensor,**kwargs):
         '''
         前向传播
         '''
-        #检查：shape是否相同;device是否相同
-        myAssert(args.__len__() > 1, "Sum must have at least 2 arguments")
-        #考虑bias的情况，这里允许出现不同shape的情况，但是要求能够广播
-        # for arg in args:
-        #     myAssert(arg.shape == args[0].shape, f"{arg}shape must be the same as {args[0]}", arg, args[0])
-        myAssert(all(arg.device == self.device for arg in args), "device must be the same",self.device)
-        
-        #算出结果
-        #这里我希望它自己会广播，于是我采用笨一点的硬加的方法
-        #a+=b这中用法要保证b是被广播的,调用尽量把大的放前面
-        result=args[0].data
-        for arg in args[1:]:
-            result+=arg.data
-        
-        
-        z = MyTensor(result, requires_grad= not all(not arg.requires_grad for arg in args), device=self.device) #暂定为，当且仅当所有输入的requires_grad=false，输出为requires_grad=false
-        ComputationalGraph.add_node(self)
-        z.father_Op = self
-        self.last.extend(list(args))
-        self.output=z
-        return z
-    def grad_func(self, node:MyTensor,grad: np.ndarray)->np.ndarray: 
+        result_data=x.data+y.data
+        return result_data
+    @classmethod
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
         '''
-        @param
-            node: MyTensor 对node求导
-            grad: np.ndarray 上游传来的梯度
-        @return
-            返回对应的导数值，为np.ndarray
+        梯度计算
+        params:
+            x: MyTensor 求导对象
+            last_grad: np.ndarray 上游梯度
+            input_tensors: list[MyTensor] 函数输入的tensor
         '''
-        return grad*np.ones_like(node.data)
+        return last_grad
 class Sub(Op):
-    def forward(self, *args) -> MyTensor:
-        #检查：只能有两个参数;shape是否相同;device是否相同
-        myAssert(args.__len__()==2, "Sub must have exact 2 arguments")
-        # myAssert(args[0].shape == args[1].shape, f"{args[0]}shape must be the same as {args[1]}", args[0], args[1])
-        myAssert(all(arg.device == self.device for arg in args), "device must be the same",self.device)
-        
-        #算出结果
-        result=args[0].data-args[1].data
-        
-        z = MyTensor(result, requires_grad= not all(not arg.requires_grad for arg in args), device=self.device) #暂定为，当且仅当所有输入的requires_grad=false，输出为requires_grad=false
-        ComputationalGraph.add_node(self)
-        z.father_Op = self
-        self.last.extend(list(args))
-        self.output=z
-        return z
-    def grad_func(self, node:MyTensor,grad: np.ndarray) ->np.ndarray: 
-        if node==self.last[0]:
-            return grad
-        elif node==self.last[1]:
-            return -grad
+    '''
+    减法
+    '''
+    @classmethod
+    @op_forward
+    def forward(cls, x:MyTensor, y:MyTensor,**kwargs):
+        '''
+        前向传播
+        '''
+        result_data=x.data-y.data
+        return result_data
+    @classmethod
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
+        '''
+        梯度计算
+        params:
+            x: MyTensor 求导对象
+            last_grad: np.ndarray 上游梯度
+            input_tensors: list[MyTensor] 函数输入的tensor
+        '''
+        if x==input_tensors[0]:
+            return last_grad
+        elif x==input_tensors[1]:
+            return -last_grad
         else:
-            raise ValueError("something wrong,check self.last")
+            raise ValueError("求导对象不在输入中")
 class Mul(Op):
-    def forward(self, *args) -> MyTensor:
+    '''
+    乘法
+    '''
+    @classmethod
+    @op_forward
+    def forward(cls, x:MyTensor, y:MyTensor,**kwargs):
         '''
         前向传播
         '''
-        #检查：shape是否相同;device是否相同
-        myAssert(args.__len__()==2, "Mul must have 2 arguments")
-        for arg in args:
-            myAssert(arg.shape == args[0].shape, f"{arg}shape must be the same as {args[0]}", arg, args[0])
-        myAssert(all(arg.device == self.device for arg in args), "device must be the same",self.device)
-        
-        #算出结果
-        result=args[0].data*args[1].data
-        
-        z = MyTensor(result,requires_grad= not all(not arg.requires_grad for arg in args), device=self.device)
-        ComputationalGraph.add_node(self)
-        z.father_Op = self
-        self.last.extend(list(args))
-        self.output=z
-        return z
-    def grad_func(self, node:MyTensor,grad: np.ndarray)->np.ndarray: 
+        result_data=x.data*y.data
+        return result_data
+    @classmethod
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
         '''
-        @param
-            node: MyTensor 对node求导
-            grad: np.ndarray 上游传来的梯度
-        @return
-            返回对应的导数值，为np.ndarray
+        梯度计算
+        params:
+            x: MyTensor 求导对象
+            last_grad: np.ndarray 上游梯度
+            input_tensors: list[MyTensor] 函数输入的tensor
         '''
-        if node==self.last[0]:
-            return grad*self.last[1].data
-        elif node==self.last[1]:
-            return grad*self.last[0].data
+        if x==input_tensors[0]:
+            return last_grad*input_tensors[1].data
+        elif x==input_tensors[1]:
+            return last_grad*input_tensors[0].data
         else:
-            raise ValueError("something wrong,check self.last")
-class Div(Op):
-    def forward(self, *args) -> MyTensor:
-        '''
-        前向传播
-        '''
-        #检查：只能有两个参数;shape是否相同;device是否相同
-        myAssert(args.__len__()==2, "Div must have exact 2 arguments")
-        myAssert(((args[0].shape == args[1].shape)or (len(args[0].data.shape)==len(args[1].data.shape))), f"{args[0]}shape/dim must be the same as {args[1]}", args[0], args[1])
-        myAssert(all(arg.device == self.device for arg in args), "device must be the same",self.device)
-        
-        #算出结果
-        result=args[0].data/args[1].data
-        
-        z = MyTensor(result, requires_grad= not all(not arg.requires_grad for arg in args), device=self.device) #暂定为，当且仅当所有输入的requires_grad=false，输出为requires_grad=false
-        ComputationalGraph.add_node(self)
-        z.father_Op = self
-        self.last.extend(list(args))
-        self.output=z
-        return z
-    def grad_func(self, node:MyTensor,grad: np.ndarray) ->np.ndarray: 
-        if node==self.last[0]:
-            return grad/self.last[1].data
-        elif node==self.last[1]:
-            return -grad*self.last[0].data/(self.last[1].data**2)
-        else:
-            raise ValueError("something wrong,check self.last")
+            raise ValueError("求导对象不在输入中")
 class MatMul(Op):
-    def forward(self, *args) -> MyTensor:
+    '''
+    矩阵乘法
+    '''
+    @classmethod
+    @op_forward
+    def forward(cls, x:MyTensor, y:MyTensor,**kwargs):
         '''
         前向传播
         '''
-        #检查：shape是否相同;device是否相同
-        myAssert(args.__len__()==2, "MatMul must have 2 arguments")
-        myAssert(args[0].ndim==2 and args[1].ndim==2,"MatMul must have 2-D tensor")
-        myAssert(args[0].shape[1]==args[1].shape[0],"MatMul shape error")
-        myAssert(all(arg.device == self.device for arg in args), "device must be the same",self.device)
-        
-        #记录下是否出现矩阵一维导致的broadcast
-        self.is_a_broadcast,self.is_b_broadcast=args[0].ndim<2,args[1].ndim<2
-        
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")  # 捕捉所有警告,主要目的为捕捉溢出
-            result=np.matmul(args[0].data,args[1].data)
-            if w:
-                for warning in w:
-                    print(f"Warning: {warning.message}")
-                    print("arg[0]:",args[0].data)
-                    print("arg[1]:",args[1].data)
-
-        z = MyTensor(result,requires_grad= not all(not arg.requires_grad for arg in args), device=self.device)
-        ComputationalGraph.add_node(self)
-        z.father_Op = self
-        self.last.extend(list(args))
-        self.output=z
-        return z
-    def grad_func(self, node:MyTensor,grad: np.ndarray)->np.ndarray: 
+        result_data=np.matmul(x.data,y.data)
+        return result_data
+    @classmethod
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
         '''
-        此处处理比较多，参考文献
-        https://welts.xyz/2022/04/26/broadcast/
-        @param
-            node: MyTensor 对node求导
-            grad: np.ndarray 上游传来的梯度
-        @return
-            返回对应的导数值，为np.ndarray
+        梯度计算
+        params:
+            x: MyTensor 求导对象
+            last_grad: np.ndarray 上游梯度
+            input_tensors: list[MyTensor] 函数输入的tensor
         '''
-        #规范上游梯度的ndim问题
-        if self.is_a_broadcast:
-            np.expand_dims(grad,axis=0)
-        if self.is_b_broadcast:
-            np.expand_dims(grad,axis=-1)
+        is_a_broadcast,is_b_broadcast=input_tensors[0].ndim<2,input_tensors[1].ndim<2
+        if is_a_broadcast:
+            last_grad=np.expand_dims(last_grad,axis=0)
+        if is_b_broadcast:
+            last_grad=np.expand_dims(last_grad,axis=-1)
+        
+        if x==input_tensors[0]:
+            grad=(last_grad@np.atleast_2d(input_tensors[1].data)) if is_b_broadcast else (last_grad@input_tensors[1].data.swapaxes(-1,-2))
+            if is_a_broadcast:
+                grad=grad[0]
+            return grad
+        elif x==input_tensors[1]:
             
-            
-        if node==self.last[0]:
-            return grad@self.last[1].data.swapaxes(-1,-2)
-        elif node==self.last[1]:
-            return self.last[0].data.swapaxes(-1,-2)@grad
+            grad= np.atleast_2d(input_tensors[0].data).swapaxes(-1,-2)@last_grad if is_a_broadcast else input_tensors[0].data.swapaxes(-1,-2)@last_grad
+            if is_b_broadcast:
+                grad=[...,0]
+            return grad
         else:
-            raise ValueError("something wrong,check self.last")
+            raise ValueError("求导对象不在输入中")
+class Div(Op):
+    '''
+    除法
+    '''
+    @classmethod
+    @op_forward
+    def forward(cls, x:MyTensor, y:MyTensor,**kwargs):
+        '''
+        前向传播
+        '''
+        result_data=x.data/y.data
+        return result_data
+    @classmethod
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
+        '''
+        梯度计算
+        params:
+            x: MyTensor 求导对象
+            last_grad: np.ndarray 上游梯度
+            input_tensors: list[MyTensor] 函数输入的tensor
+        '''
+        if x==input_tensors[0]:
+            return last_grad/input_tensors[1].data
+        elif x==input_tensors[1]:
+            return -last_grad*input_tensors[0].data/input_tensors[1].data**2
+        else:
+            raise ValueError("求导对象不在输入中")
 class Max(Op):
     '''
-        max算子
-        实例化时可以指定axis和keepdims
+    最大值
     '''
-    def __init__(self, device: str = "cpu", requires_grad: bool = False,axis=None,keepdims=False) -> None:
-        super().__init__(device, requires_grad)
-        self.axis=axis
-        self.keepdims=keepdims
-    def forward(self, *args) -> MyTensor:
+    @classmethod
+    @op_forward
+    def forward(cls, x:MyTensor, **kwargs):
         '''
         前向传播
+        params:
+            x: MyTensor 输入
+            axis: int 求最大值的轴
+            keepdims: bool 是否保留维度
         '''
-        #检查：检查参数是否唯一
-        myAssert(args.__len__()==1, "Max must have 1 arguments")
-        
-        #算出结果
-        result=np.max(args[0].data,axis=self.axis,keepdims=self.keepdims)
-        
-        z = MyTensor(result,requires_grad= not all(not arg.requires_grad for arg in args), device=self.device)
-        ComputationalGraph.add_node(self)
-        z.father_Op = self
-        self.last.extend(list(args))
-        self.output=z
-        return z
-    def grad_func(self, node,grad: np.ndarray) -> np.ndarray:
-        '''参数node会被忽略，因为max是一个单输入的op'''
-        #由于所有的比较都要求比较的位置对应，为增强鲁棒性，直接把output的data扩展到和input一样的dim
-        if self.keepdims:
-            y_full_dim=self.output.data
-        else:
-            y_full_dim=np.expand_dims(self.output.data,axis=self.axis)
-        return (np.isclose(self.last[0].data,y_full_dim,atol=1e-8)).astype(float)*grad
+        assert "axis" in kwargs, "kwargs must contain 'axis'"
+        assert "keepdims" in kwargs, "kwargs must contain 'keepdims'"
+        result_data=np.max(x.data, axis=kwargs["axis"], keepdims=kwargs["keepdims"])
+        return result_data
+    @classmethod
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
+        '''
+        梯度计算
+        params:
+            x: MyTensor 求导对象
+            last_grad: np.ndarray 上游梯度
+            input_tensors: list[MyTensor] 函数输入的tensor
+        '''
+        axis=kwargs["axis"]
+        keepdims=kwargs["keepdims"]
+        if not keepdims:
+            last_grad=np.expand_dims(last_grad,axis=axis)
+        mask=np.equal(x.data,np.max(x.data,axis=axis,keepdims=True))
+        return last_grad*mask
 class Exp(Op):
-    def forward(self, *args) -> MyTensor:
+    '''
+    指数
+    '''
+    @classmethod
+    @op_forward
+    def forward(cls, x:MyTensor, **kwargs):
         '''
         前向传播
         '''
-        #检查：检查参数是否唯一
-        myAssert(args.__len__()==1, "exp must have 1 arguments")
-        
-        #算出结果
-        result=np.exp(args[0].data)
-        
-        z = MyTensor(result,requires_grad= not all(not arg.requires_grad for arg in args), device=self.device)
-        ComputationalGraph.add_node(self)
-        z.father_Op = self
-        self.last.extend(list(args))
-        self.output=z
-        return z
-    def grad_func(self, node,grad: np.ndarray) -> np.ndarray:
-        '''参数node会被忽略，因为exp是一个单输入的op'''
-        return np.exp(self.last[0].data)*grad
+        result_data=np.exp(x.data)
+        return result_data
+    @classmethod
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
+        '''
+        梯度计算
+        params:
+            x: MyTensor 求导对象
+            last_grad: np.ndarray 上游梯度
+            input_tensors: list[MyTensor] 函数输入的tensor
+        '''
+        return last_grad*np.exp(x.data)
 class Log(Op):
-    def forward(self, *args) -> MyTensor:
+    '''
+    对数
+    '''
+    @classmethod
+    @op_forward
+    def forward(cls, x:MyTensor, **kwargs):
         '''
         前向传播
         '''
-        #检查：检查参数是否唯一
-        myAssert(args.__len__()==1, "log must have 1 arguments")
-        
-        #算出结果
-        result=np.log(args[0].data)
-        
-        z = MyTensor(result,requires_grad= not all(not arg.requires_grad for arg in args), device=self.device)
-        ComputationalGraph.add_node(self)
-        z.father_Op = self
-        self.last.extend(list(args))
-        self.output=z
-        return z
-    def grad_func(self, node,grad: np.ndarray) -> np.ndarray:
-        '''参数node会被忽略，因为log是一个单输入的op'''
-        return grad/self.last[0].data
+        result_data=np.log(x.data)
+        return result_data
+    @classmethod
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
+        '''
+        梯度计算
+        params:
+            x: MyTensor 求导对象
+            last_grad: np.ndarray 上游梯度
+            input_tensors: list[MyTensor] 函数输入的tensor
+        '''
+        return last_grad/x.data
 class SumUnary(Op):
-    def __init__(self, device = "cpu", requires_grad = False,axis=None,keepdims=False) -> None:
-        super().__init__(device, requires_grad)
-        self.axis=axis
-        self.keepdims=keepdims
-    def forward(self, *args) -> MyTensor:
+    '''
+    求和
+    '''
+    @classmethod
+    @op_forward
+    def forward(cls, x:MyTensor, **kwargs):
         '''
         前向传播
+        @param
+            x: MyTensor 输入
+            axis: int 求和的轴
+            keepdims: bool 是否保留维度
         '''
-        #检查：检查参数是否唯一
-        myAssert(args.__len__()==1, "sum must have 1 arguments")
-        
-        #算出结果
-        result=np.sum(args[0].data,axis=self.axis,keepdims=self.keepdims)
-        
-        z = MyTensor(result,requires_grad= not all(not arg.requires_grad for arg in args), device=self.device)
-        ComputationalGraph.add_node(self)
-        z.father_Op = self
-        self.last.extend(list(args))
-        self.output=z
-        return z
-    def grad_func(self, node,grad: np.ndarray) -> np.ndarray:
-        '''参数node会被忽略，因为sum是一个单输入的op'''
-        if not (self.axis is None or self.keepdims):
-            grad=np.expand_dims(grad,axis=self.axis)
-        return np.ones_like(self.last[0].data)*grad
-if __name__ == "__main__":
-    #利用torch,对+，-，*，@进行测试
-    import torch
-    a = MyTensor(np.random.randn(1, 3), requires_grad=True)
-    b = MyTensor(np.random.randn(1, 3), requires_grad=True)
-    c = MyTensor(np.random.randn(1, 3), requires_grad=True)
-    d = MyTensor(np.random.randn(1, 3), requires_grad=True)
-    e = MyTensor(np.random.randn(1, 3), requires_grad=True)
-    ops = ['mul', 'sum', 'sum','sub']
-    def torch_result(*inputs, ops):
-        input_torch = [torch.tensor(i, dtype=torch.float32, requires_grad=True) for i in inputs]
-        result_torch = input_torch[0]
-
-        for i, op in enumerate(ops):
-            if op == 'mul':
-                result_torch = result_torch * input_torch[i + 1]
-            elif op == 'sum':
-                result_torch = result_torch + input_torch[i + 1]
-            elif op == 'sub':
-                result_torch = result_torch - input_torch[i + 1]
-            else:
-                raise ValueError(f"Unsupported operation: {op}")
-        result_torch.sum().backward()
-        return result_torch, [i.grad.numpy() for i in input_torch]
-
-    def test(ops, *my_tensors):
-        result = my_tensors[0]
-        for i, op in enumerate(ops):
-            if op == 'mul':
-                result = Mul().forward(result, my_tensors[i + 1])
-            elif op == 'sum':
-                result = Sum().forward(result, my_tensors[i + 1])
-            elif op == 'sub':
-                result = Sub().forward(result, my_tensors[i + 1])
-            else:
-                raise ValueError(f"Unsupported operation: {op}")
-
-        result.backward()
-        my_tensor_data = [tensor.data for tensor in my_tensors]
-        torch_result_val, torch_grads = torch_result(*my_tensor_data, ops=ops)
-
-        assert np.allclose(result.data, torch_result_val.detach().numpy(), atol=1e-5), f"Results do not match! Custom = {result.data}, Torch = {torch_result_val.detach().numpy()}"
-        for i, my_tensor in enumerate(my_tensors):
-            assert np.allclose(my_tensor.grad, torch_grads[i], atol=1e-5), f"Gradients do not match for input {i}! Custom = {my_tensor.grad}, Torch = {torch_grads[i]}"
-
-    test(ops, a, b, c, d,e)
-    print("所有结果和梯度匹配！")
-
-
-    def torch_resultmat(*input, op):
-        input_torch = [torch.tensor(i, dtype=torch.float32, requires_grad=True) for i in input]
-        result_torch = op(*input_torch)
-        result_torch.sum().backward()
-        return [i.grad.numpy() for i in input_torch]
-    for _ in range(100):
-        A = MyTensor(np.random.randn(3,3), requires_grad=True)
-        B = MyTensor(np.random.randn(3,3), requires_grad=True)
-        matmul = MatMul()
-        result = matmul.forward(A, B)
-        result.backward()
-        result_torch = torch_resultmat(A.data, B.data, op=torch.matmul)
-        assert np.allclose(A.grad, result_torch[0], atol = 1e-5), f"MatMul gradients do not match! Custom = {A.grad}, Torch = {result_torch[0]}"
-        assert np.allclose(B.grad, result_torch[1], atol = 1e-5), f"MatMul gradients do not match! Custom = {B.grad}, Torch = {result_torch[1]}"
-    
-    print("MatMul 梯度匹配！")
-    
-    #测试max
-    a = np.array([[ 1.27920267, -1.49798259, -0.95754972],
-              [-3.24696494,  1.27485179,  0.34984062],
-              [-0.21765164 ,-0.13258395 ,-0.16691512]])
-    print(a)
-    a=MyTensor(a,requires_grad=True)
-    max=Max(axis=1,keepdims=False)
-    result=max.forward(a)
-    print(result)
-    result.backward()
-    print(a.grad)
+        result_data=np.sum(x.data,axis=kwargs["axis"],keepdims=kwargs["keepdims"])
+        return result_data
+    @classmethod
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
+        '''
+        梯度计算
+        params:
+            x: MyTensor 求导对象
+            last_grad: np.ndarray 上游梯度
+            input_tensors: list[MyTensor] 函数输入的tensor
+        '''
+        if not (kwargs["axis"] is None or kwargs["keepdims"]):
+            last_grad=np.expand_dims(last_grad,axis=kwargs["axis"])
+        return last_grad*np.ones_like(x.data)
