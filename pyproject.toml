@@ -1,0 +1,21 @@
+[project]
+name = "myTorch"
+version = "0.1.0"
+description = "A minimal deep learning framework similar to PyTorch."
+authors = [
+    { name = "nju-syt", email = "nju221300094@163.com" }
+]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "torch",
+    "pytest"
+]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests"
+]
