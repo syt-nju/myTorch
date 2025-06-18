@@ -72,3 +72,20 @@ batch norm在干一件什么事
 >
 > ​    3.向量化操作：对于向量的计算有着良好的可**并行**特性，numpy实现上做了并行化，充分利用CPU资源
 
+## 为什么市面上的LLM 主流为decoder-only，而不是encoder-only 或者 encoder-decoder?
+
+![image-20250610220853929](https://typorasyt.oss-cn-nanjing.aliyuncs.com/202506102209020.png)
+
+- decoder-only的三角矩阵必定满秩
+
+  > 观点搬运自苏神(苏剑林)
+  >
+  > 原文
+  >
+  > “众所周知，Attention矩阵一般是由一个低秩分解的矩阵加softmax而来，具体来说是一个$𝑛×𝑑$的矩阵与$𝑑×𝑛$的矩阵相乘后再加softmax（$n≫d$），这种形式的Attention的矩阵因为低秩问题而带来表达能力的下降，具体分析可以参考[《Attention is Not All You Need: Pure Attention Loses Rank Doubly Exponentially with Depth》](https://papers.cool/arxiv/2103.03404)。而Decoder-only架构的Attention矩阵是一个下三角阵，注意三角阵的行列式等于它对角线元素之积，由于softmax的存在，**对角线必然都是正数**，所以它的行列式必然是正数，即Decoder-only架构的**Attention矩阵一定是满秩**的！满秩意味着理论上有更强的表达能力，也就是说，Decoder-only架构的Attention矩阵在理论上具有更强的表达能力，改为双向注意力反而会变得不足。”
+  >
+  > 其实意思就是双向注意力可能面临训练过后矩阵rank坍塌的问题导致等参数下，模型的学习能力更差的问题
+
+- decoder 任务天生难于encoder 任务，因此可能学到更好的表示
+
+> Ilya 演讲中似乎提过这一点
