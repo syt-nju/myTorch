@@ -218,17 +218,20 @@ class MyTensor():
         '''
         最大值
         '''
-        return np.max(self.data, axis=axis, keepdims=keepdims)
+        result = np.max(self.data, axis=axis, keepdims=keepdims)
+        return MyTensor(result, requires_grad=self.requires_grad)
 
     def sum(self, axis = None, keepdims: bool = False):
-        return np.sum(self, axis, keepdims)
+        result = np.sum(self.data, axis=axis, keepdims=keepdims)
+        return MyTensor(result, requires_grad=self.requires_grad)
+
 def op_forward(forward_func):
     '''
     修饰器，用于Op的forward方法
     '''
     def wrapper(cls, *args,axis=0,keepdims=False):
         device=args[0].device
-        myAssert(all(arg.device == device for arg in args), "device must be the same",device)
+        myAssert(all(arg.device == device for arg in args if hasattr(arg, 'device')), "device must be the same",device)
         data=forward_func(cls,*args,axis=axis,keepdims=keepdims)
         result = MyTensor(data, requires_grad= not all(not arg.requires_grad for arg in args), device=device)
         result.father_tensor=args
@@ -266,8 +269,13 @@ class Sum(Op):
         '''
         前向传播
         '''
-        result_data=x.data+y.data
-        return result_data
+        if isinstance(y, int):
+            y = MyTensor(np.array(y), requires_grad=False, device=x.device, dtype=x.dtype)
+        if isinstance(y, MyTensor):
+            result_data = x.data + y.data
+            return result_data
+        else:
+            raise TypeError("MyTensor can only add MyTensor")
     @classmethod
     def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
         '''
@@ -288,8 +296,13 @@ class Sub(Op):
         '''
         前向传播
         '''
-        result_data=x.data-y.data
-        return result_data
+        if isinstance(y, int):
+            y = MyTensor(np.array(y), requires_grad=False, device=x.device, dtype=x.dtype)
+        if isinstance(y, MyTensor):
+            result_data = x.data - y.data
+            return result_data
+        else:
+            raise TypeError("MyTensor can only add MyTensor")
     @classmethod
     def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
         '''
@@ -315,8 +328,13 @@ class Mul(Op):
         '''
         前向传播
         '''
-        result_data=x.data*y.data
-        return result_data
+        if isinstance(y, int):
+            y = MyTensor(np.array(y), requires_grad=False, device=x.device, dtype=x.dtype)
+        if isinstance(y, MyTensor):
+            result_data = x.data * y.data
+            return result_data
+        else:
+            raise TypeError("MyTensor can only add MyTensor")
     @classmethod
     def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
         '''
@@ -382,8 +400,13 @@ class Div(Op):
         '''
         前向传播
         '''
-        result_data=x.data/y.data
-        return result_data
+        if isinstance(y, int):
+            y = MyTensor(np.array(y), requires_grad=False, device=x.device, dtype=x.dtype)
+        if isinstance(y, MyTensor):
+            result_data = x.data / y.data
+            return result_data
+        else:
+            raise TypeError("MyTensor can only add MyTensor")
     @classmethod
     def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
         '''
@@ -394,7 +417,7 @@ class Div(Op):
             input_tensors: list[MyTensor] 函数输入的tensor
         '''
         if x==input_tensors[0]:
-            return last_grad/input_tensors[1].data
+            return last_grad / input_tensors[1].data
         elif x==input_tensors[1]:
             return -last_grad*input_tensors[0].data/input_tensors[1].data**2
         else:
