@@ -89,3 +89,13 @@ batch norm在干一件什么事
 - decoder 任务天生难于encoder 任务，因此可能学到更好的表示
 
 > Ilya 演讲中似乎提过这一点
+
+## 能讲一下上层python写一个加法dispatch算子到整个流程吗
+
+
+
+## 讲讲怎么判断两个tensor指向同一块现存
+
+
+
+## autograd engine 对于分布式的情况是如何处理的
