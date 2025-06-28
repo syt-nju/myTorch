@@ -90,6 +90,130 @@ batch norm在干一件什么事
 
 > Ilya 演讲中似乎提过这一点
 
+
+## 比较 pretraining, CPT（continual pre-training）,SFT,post training 
+
+> 我们从训练数据、训练方式(损失函数)、训练目标三个角度来阐述这个问题。
+>
+> pre-trainning 使用自回归的训练方式，数据可以是爬下来的任何文本，本质上是教模型基础的语言逻辑和通用知识。
+>
+> CPT也叫pre-training 所以训练方式本质上还是pre-trainning，目的是让模型学会新知识或者是一些领域知识，为防止模型遗忘通用知识，一般把新数据和普通文本混合起来训练模型。
+>
+> SFT(supervised fine-tuning)则是让模型**学会对话**(或者类o1输出之类的要求)，一般用ChatTemplate去构造数据，一般还是自回归的训练方式。
+>
+> post-training 一般为RLHF等基于**强化学习**的对齐范式，包括PPO，DPO等微调，目的是对模型的回复引入人的偏好和安全性对齐等。一般认为post-training对模型的**修改量比较小**。
+>
+> 其实后面两种本质上都是微调，但是可以认为sft对模型的修改大于post-training，因此需要注意SFT的数据质量问题。
+
+## 从深度学习的视角对李沐的参数服务器内容进行概述，构建一个基础的深度学习并行框架
+
+### 所需要解决的问题
+
+1.能在考虑性能的前提下，把分布式框架用于深度学习pipeline
+
+2.构建具有一定可扩展性和容灾能力的分布式框架
+
+### 框架
+
+![image-20250109142456254](https://typorasyt.oss-cn-nanjing.aliyuncs.com/202501091425387.png)
+
+#### 可扩展性
+
+为了可扩展性，李沐提出的框架以parameter server为核心，存权重，负责数据管理。而worker只是个打工的，负责计算或某种任务。由于**worker完全与存储剥离**，可扩展性拉满了。
+
+(数据的分发可以额外做一个分发数据的管理器，也可以让参数服务器代劳，感觉不是很重要，因为没有同步需求咋滴都行)
+
+#### 容灾方面
+
+为减小通信成本，worker向参数服务器申请模型权重等数据的时候，通过index来申请。
+
+意即，事先给weight做个**hash mapping**，key用一定范围的int来表示，相当于给了weight一些下标。用这些index来对weight进行指代，在不利用具体值的时候通过对index的通讯来传递信息。
+
+而对权重的容灾就是**维护这个dict**。
+
+![image-20250109144530040](https://typorasyt.oss-cn-nanjing.aliyuncs.com/202501091445096.png)
+
+具体来说，根据参数服务器的服务器数量，根据key的范围各自维护一段dict，而每个服务器又根据key的范围顺带备份后面两段的dict，相当于**循环备份了两份**，并且这些服务器本身就参与架构，可以瞬间启动。
+
+### 通信成本问题
+
+这套架构最大的问题就是通讯成本极高，如果不做调整，pull和push都得传一遍整个权重/整个梯度，相当炸裂。
+
+为此，李沐在通讯前后对数据进行压缩，一般权重的压缩效果比较好，key就不太能压缩。
+
+但是其实还是改变不了通讯成本太炸裂的问题。
+
+### waiting time问题
+
+由于不同worker执行完任务的时间是不一致的，为了减少worker间的相互等待，实操上我们选择**牺牲收敛速度**，不即时更新权重(有限度**延迟更新**或者完全延迟更新)
+
+![image-20250109145702160](https://typorasyt.oss-cn-nanjing.aliyuncs.com/202501091457207.png)
+
+## 请介绍Megatron
+
+> Megatron 是针对**大语言模型**的基于pytorch的**分布式**训练框架。
+>
+> 为解决模型参数过多的问题，设计了**三层并行**。
+>
+> 注意，我们看并行模型要注重看不同通信模式下的通信量。
+>
+> - **数据并行 (DP)**: 数据并行模式会在每个worker之上**复制一份模型**，这样每个worker都有一个完整模型的副本。输入数据集是分片的，一个训练的小批量数据将在多个worker之间分割；worker**定期汇总**它们的梯度，以确保所有worker看到一个一致的权重版本
+> - **张量并行 (TP)**: 矩阵太大，显存太小放不下，只能把**矩阵运算分配到不同的设备之上**，比如把某个矩阵乘法切分成为多个矩阵乘法放到不同设备之上(对应的batch的矩阵也会被拆分)。
+> - **流水线并行 (PP)**: 把模型**不同的层放到不同设备之上**，比如前面几层放到一个设备之上，中间几层放到另外一个设备上，最后几层放到第三个设备之上。（这样把pipeline进行拆分细化能够减小backward和forward的依赖性带来的waiting time）
+>
+> 
+
+![image-20241224202714231](https://typorasyt.oss-cn-nanjing.aliyuncs.com/202412242027330.png)
+
+![image-20241224202736900](https://typorasyt.oss-cn-nanjing.aliyuncs.com/202412242027981.png)
+
+## 请给出以下代码的输出
+
+```python
+def get_iter(id):
+    if id==1:
+        yield from range(2)
+    elif id==2:
+        yield from range(3,5)
+    else:
+        return iter(range(10))
+for i in range(3):
+    for j in get_iter(i):
+        print(j)
+
+```
+
+> 关键注意这个畜生 return， 在函数里面有yeild的情况下，return等价于StopIteration,输出如下
+
+>0
+>1
+>3
+>4
+
+## 介绍deepspeed的ZeRO
+
+> 为了减少训练阶段的显存消耗，deepspeed框架提供了ZeRO(Zero Redundancy Optimizer)方法。
+>
+> 回忆DP参数服务器，每个worker都得跑整个模型，存储对应的参数和，优化器参数等。
+>
+> 但是实际上都只需要一份就行了。
+>
+> ZeRO的思想就是去把这些进行聚合和切片，分到每个worker上。
+>
+> 分三个stage
+
+![image-20250120150954183](https://typorasyt.oss-cn-nanjing.aliyuncs.com/202501201510308.png)
+
+> 开的约高越省显存，但是由于这些资源每次调用都得worker之间通讯，**通讯成本大大增加**。
+>
+> 可以理解为，把整个模型拆分成了若干个层(与模型无关)，每次开始计算这个层的时候，左右worker经过通讯拿到所需要的该层相关的参数，结束后又广播或者求和后再广播，使得每个worker只存其中一部分参数。
+
+> torch也对这个做了适配，叫做fsdp，实现上有一定差别，但是效果都是减少显存消耗。
+>
+> 调用方式上，都可以采用accelerate config 来进行配置后调用。代码中只需适配accelerate即可。
+>
+> 具体适配上的细节可以见网址：[7_accelerate (huaxiaozhuan.com)](https://www.huaxiaozhuan.com/工具/huggingface_transformer/chapters/7_accelerate.html)
+
 ## 能讲一下上层python写一个加法dispatch算子到整个流程吗
 
 
