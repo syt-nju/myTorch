@@ -218,10 +218,20 @@ class MyTensor():
         '''
         最大值
         '''
-        return np.max(self.data, axis=axis, keepdims=keepdims)
+        return Max.forward(self, axis=axis, keepdims=keepdims)
 
     def sum(self, axis = None, keepdims: bool = False):
-        return np.sum(self, axis, keepdims)
+        """_summary_
+
+        Args:
+            axis (_type_, optional): _description_. Defaults to None.
+            keepdims (bool, optional): _description_. Defaults to False.
+
+        Returns:
+            _type_: _description_
+        """
+        return SumUnary.forward(self, axis=axis, keepdims=keepdims)
+        
 def op_forward(forward_func):
     '''
     修饰器，用于Op的forward方法
@@ -394,7 +404,7 @@ class Div(Op):
             input_tensors: list[MyTensor] 函数输入的tensor
         '''
         if x==input_tensors[0]:
-            return last_grad/input_tensors[1].data
+            return last_grad / input_tensors[1].data
         elif x==input_tensors[1]:
             return -last_grad*input_tensors[0].data/input_tensors[1].data**2
         else:
