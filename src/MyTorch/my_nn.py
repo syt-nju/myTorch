@@ -97,14 +97,24 @@ class LogSoftmax(ModuleBase):
         result = Sub.forward(x_sub_max,Log.forward(exp_sum))
         return result
 class ReLU(Op):
+    '''
+    ReLU激活函数
+    '''
+    @classmethod
     @op_forward
-    def forward(self,*args,**kwargs)->MyTensor:
-        '''    x.data = np.maximum(x.data, 0)'''
-        result=np.maximum(args[0],0)
-        return result  
-    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
-        '''    grad = np.where(x.data > 0, grad, 0)'''
-        result = np.where(x.data>0,last_grad,0)     
-        return result
-    def __repr__(self) -> str:
+    def forward(cls, x: MyTensor, **kwargs):
+        '''
+        前向传播
+        '''
+        result_data = np.maximum(0, x.data)
+        return result_data
+    
+    @classmethod
+    def grad_fn(cls, x: MyTensor, last_grad: np.ndarray, input_tensors: list[MyTensor], **kwargs):
+        '''
+        梯度计算
+        '''
+        mask = (x.data > 0).astype(x.data.dtype)
+        return last_grad * mask
+    def __repr__(self):
         return 'ReLU()'

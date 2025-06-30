@@ -1,6 +1,37 @@
 import numpy as np
 from MyTorch.utils.utils import myAssert
-#重构一版,修改计算图进入逻辑以更贴合pytorch
+import functools
+
+def tensor_operation(func):
+    """
+    装饰器用于基础数学运算 (+, -, *, /)
+    自动将非MyTensor类型转换为MyTensor，并进行类型检查
+    """
+    @functools.wraps(func)
+    def wrapper(self, other):
+        # 如果other不是MyTensor实例，尝试转换
+        if not isinstance(other, MyTensor):
+            # 检查是否为支持的类型
+            if isinstance(other, (int, float, list, tuple, np.ndarray)):
+                try:
+                    other = MyTensor(np.array(other), dtype=self.data.dtype, device=self.device) #无脑转ndarray
+                except Exception as e:
+                    raise TypeError(f"无法将类型 {type(other)} 转换为 MyTensor: {e}")
+            else:
+                raise TypeError(f"不支持的操作数类型: {type(other)}")
+                
+        # 检查形状兼容性（广播规则）
+        try:
+            np.broadcast_arrays(self.data, other.data)
+        except ValueError as e:
+            raise ValueError(f"张量形状不兼容: {self.data.shape} 和 {other.data.shape}")
+        
+        # 调用原始方法
+        return func(self, other)
+    
+    return wrapper
+
+#重构一版,修改计算图进入邏輯以更貼合pytorch
 #这版计算图只存tensor
 class ComputationalGraph():
     node_list=list()
@@ -71,30 +102,35 @@ class MyTensor():
         return f"MyTensor({self.data})"
     #注意，为了简单处理，我强制要求+-* @所有的操作数都是MyTensor类型，除法被除数必须Tensor类型
     #注意，此时的计算是直接对data进行操作，不涉及梯度传播
+    @tensor_operation
     def __add__(self, other):
         '''
         重写加法运算
         '''
         return Sum.forward(self,other)
 
+    @tensor_operation
     def __radd__(self, other):
         '''
         重写反向加法运算
         '''
         return self.__add__(other)
 
+    @tensor_operation
     def __sub__(self, other):
         '''
         重写减法运算
         '''
         return Sub.forward(self,other)
 
+    @tensor_operation
     def __rsub__(self, other):
         '''
         重写反向减法运算
         '''
-        return self.__sub__(other)
+        return Sub.forward(other,self)
 
+    @tensor_operation
     def __mul__(self, other):
         '''
         重写乘法运算
@@ -102,6 +138,7 @@ class MyTensor():
         '''
         return Mul.forward(self,other)
 
+    @tensor_operation
     def __rmul__(self, other):
         '''
         重写反向乘法运算
@@ -113,16 +150,21 @@ class MyTensor():
         重写矩阵乘法运算
         '''
         return MatMul.forward(self,other)
+    
+    @tensor_operation
     def __truediv__(self, other):
         '''
         重写除法运算
         '''
-        Div.forward(self,other)
+        return Div.forward(self,other)
+    
+    @tensor_operation
     def __rtruediv__(self, other):
         '''
         重写反向除法运算
         '''
-        return self.__truediv__(other)
+        return Div.forward(other,self)
+
     @property
     def transpose(self):
         '''
@@ -177,7 +219,6 @@ class MyTensor():
         return self.data[key]
     
 
-    #TODO: 实现梯度相关的方法
     @property
     def is_leaf(self)->bool:
         '''
@@ -202,8 +243,10 @@ class MyTensor():
             if not tensor.is_leaf:
                 for i in tensor.father_tensor:
                     if i.requires_grad:
-                        i.grad+=tensor.father_op.grad_fn(i,tensor.grad,tensor.father_tensor,axis=tensor.axis,keepdims=tensor.keepdims)
-
+                        last_grad=tensor.father_op.grad_fn(i,tensor.grad,tensor.father_tensor,axis=tensor.axis,keepdims=tensor.keepdims)
+                        last_grad=Op._reduce_grad_for_broadcast(last_grad,i.data.shape)
+                        #将梯度加到父节点上 
+                        i.grad+=last_grad
         #清空计算图
         if not retain_graph:
             ComputationalGraph.clear()
@@ -236,6 +279,7 @@ def op_forward(forward_func):
     '''
     修饰器，用于Op的forward方法
     '''
+    @functools.wraps(forward_func) ## 保留原函数的元数据(即保留函数名什么的不变性)
     def wrapper(cls, *args,axis=0,keepdims=False):
         device=args[0].device
         myAssert(all(arg.device == device for arg in args), "device must be the same",device)
@@ -264,7 +308,29 @@ class Op():
         梯度计算
         '''
         raise NotImplementedError
-    
+
+    def _reduce_grad_for_broadcast(grad, target_shape):
+        """
+        处理因广播导致的梯度形状不匹配问题
+        将梯度缩减到目标形状
+        """
+        # 如果形状已经匹配，直接返回
+        if grad.shape == target_shape:
+            return grad
+        
+        # 计算需要缩减的轴
+        ndims_added = grad.ndim - len(target_shape)
+        
+        # 首先移除前面添加的维度
+        for _ in range(ndims_added):
+            grad = grad.sum(axis=0)
+        
+        # 然后处理广播的维度
+        for i in range(len(target_shape)):
+            if target_shape[i] == 1 and grad.shape[i] > 1:
+                grad = grad.sum(axis=i, keepdims=True)
+        
+        return grad
 
 class Sum(Op):
     '''
