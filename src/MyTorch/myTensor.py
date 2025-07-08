@@ -241,9 +241,9 @@ class MyTensor():
         self.grad=np.ones_like(self.data).astype(self.data.dtype)
         for tensor in reversed(ComputationalGraph.node_list):
             if not tensor.is_leaf:
-                for i in tensor.father_tensor:
+                for idx, i in enumerate(tensor.father_tensor):
                     if i.requires_grad:
-                        last_grad=tensor.father_op.grad_fn(i,tensor.grad,tensor.father_tensor,axis=tensor.axis,keepdims=tensor.keepdims)
+                        last_grad=tensor.father_op.grad_fn(i, tensor.grad,tensor.father_tensor,idx = idx, axis=tensor.axis, keepdims=tensor.keepdims)
                         last_grad=Op._reduce_grad_for_broadcast(last_grad,i.data.shape)
                         #将梯度加到父节点上 
                         i.grad+=last_grad
@@ -367,7 +367,7 @@ class Sub(Op):
         result_data=x.data-y.data
         return result_data
     @classmethod
-    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
+    def grad_fn(cls, x:MyTensor, last_grad:np.ndarray, input_tensors:list[MyTensor], idx: int, **kwargs):
         '''
         梯度计算
         params:
@@ -375,9 +375,9 @@ class Sub(Op):
             last_grad: np.ndarray 上游梯度
             input_tensors: list[MyTensor] 函数输入的tensor
         '''
-        if x==input_tensors[0]:
+        if idx == 0:
             return last_grad
-        elif x==input_tensors[1]:
+        elif idx == 1:
             return -last_grad
         else:
             raise ValueError("求导对象不在输入中")
@@ -421,7 +421,7 @@ class MatMul(Op):
         result_data=np.matmul(x.data,y.data)
         return result_data
     @classmethod
-    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
+    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],idx: int,**kwargs):
         '''
         梯度计算
         params:
@@ -435,12 +435,12 @@ class MatMul(Op):
         if is_b_broadcast:
             last_grad=np.expand_dims(last_grad,axis=-1)
         
-        if x==input_tensors[0]:
+        if idx == 0:
             grad=(last_grad@np.atleast_2d(input_tensors[1].data)) if is_b_broadcast else (last_grad@input_tensors[1].data.swapaxes(-1,-2))
             if is_a_broadcast:
                 grad=grad[0]
             return grad
-        elif x==input_tensors[1]:
+        elif idx == 1:
             
             grad= np.atleast_2d(input_tensors[0].data).swapaxes(-1,-2)@last_grad if is_a_broadcast else input_tensors[0].data.swapaxes(-1,-2)@last_grad
             if is_b_broadcast:
@@ -461,7 +461,7 @@ class Div(Op):
         result_data=x.data/y.data
         return result_data
     @classmethod
-    def grad_fn(cls,x:MyTensor,last_grad:np.ndarray,input_tensors:list[MyTensor],**kwargs):
+    def grad_fn(cls, x:MyTensor, last_grad:np.ndarray, input_tensors:list[MyTensor], idx: int, **kwargs):
         '''
         梯度计算
         params:
@@ -469,9 +469,9 @@ class Div(Op):
             last_grad: np.ndarray 上游梯度
             input_tensors: list[MyTensor] 函数输入的tensor
         '''
-        if x==input_tensors[0]:
+        if idx == 0:
             return last_grad / input_tensors[1].data
-        elif x==input_tensors[1]:
+        elif idx == 1:
             return -last_grad*input_tensors[0].data/input_tensors[1].data**2
         else:
             raise ValueError("求导对象不在输入中")
